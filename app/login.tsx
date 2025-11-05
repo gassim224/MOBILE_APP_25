@@ -48,9 +48,9 @@ export default function Login() {
       await AsyncStorage.setItem("sessionToken", sessionToken);
       await AsyncStorage.setItem("userProfile", JSON.stringify(userProfile));
 
-      // Navigate to home with smooth transition
+      // Navigate to tabs with smooth transition
       setTimeout(() => {
-        router.replace("/home");
+        router.replace("/(tabs)/contenu");
       }, 200);
     } catch (error) {
       console.error("Login error:", error);
