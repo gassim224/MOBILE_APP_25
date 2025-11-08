@@ -9,6 +9,7 @@ import {
   Platform,
   ScrollView,
   ActivityIndicator,
+  Image,
 } from "react-native";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -70,19 +71,25 @@ export default function Login() {
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Illustration Placeholder */}
+          {/* Header Image */}
           <View style={styles.illustrationContainer}>
             <View style={styles.illustrationPlaceholder}>
-              <Text style={styles.illustrationText}>👨🏿‍🎓 👩🏿‍🎓</Text>
-              <Text style={styles.illustrationSubtext}>
-                Black Excellence in Learning
-              </Text>
+              <Image
+                source={require("@/assets/images/login-header.png")}
+                style={styles.headerImage}
+                resizeMode="cover"
+              />
+              <View style={styles.imageOverlay}>
+                <Text style={styles.illustrationSubtext}>
+                  Black kids in Learning
+                </Text>
+              </View>
             </View>
           </View>
 
           {/* Welcome Text */}
           <View style={styles.welcomeContainer}>
-            <Text style={styles.welcomeTitle}>Bienvenue à Learnsphere</Text>
+            <Text style={styles.welcomeTitle}>Bonecole - votre école au bout du doigt</Text>
             <Text style={styles.welcomeSubtitle}>
               Connectez-vous pour commencer votre voyage d&apos;apprentissage
             </Text>
@@ -91,7 +98,7 @@ export default function Login() {
           {/* Login Form */}
           <View style={styles.formContainer}>
             <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>ID Étudiant</Text>
+              <Text style={styles.inputLabel}>Identifiant Élève</Text>
               <TextInput
                 style={styles.input}
                 placeholder="Entrez votre ID étudiant"
@@ -137,7 +144,7 @@ export default function Login() {
           {/* Encouraging Message */}
           <View style={styles.encouragementContainer}>
             <Text style={styles.encouragementText}>
-              ✨ Votre avenir commence ici ✨
+              ✨ Votre aventure commence ici ✨
             </Text>
           </View>
         </ScrollView>
@@ -163,19 +170,27 @@ const styles = StyleSheet.create({
   illustrationPlaceholder: {
     width: 200,
     height: 200,
-    backgroundColor: "#1E3A5F", // Academic Blue
     borderRadius: 20,
-    justifyContent: "center",
-    alignItems: "center",
+    overflow: "hidden",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 5,
+    position: "relative",
   },
-  illustrationText: {
-    fontSize: 64,
-    marginBottom: 8,
+  headerImage: {
+    width: "100%",
+    height: "100%",
+  },
+  imageOverlay: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: "rgba(30, 58, 95, 0.85)",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
   },
   illustrationSubtext: {
     color: "#FFFFFF",
