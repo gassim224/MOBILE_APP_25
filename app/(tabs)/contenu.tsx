@@ -11,6 +11,7 @@ import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
+import NetInfo from "@react-native-community/netinfo";
 
 interface UserProfile {
   studentName: string;
@@ -40,27 +41,45 @@ const CARD_WIDTH = width * 0.7;
 const MOCK_COURSES: Course[] = [
   {
     id: "1",
-    title: "Mathématiques Avancées",
+    title: "Mathématiques",
     description: "Algèbre et Géométrie",
     thumbnail: "📐",
   },
   {
     id: "2",
-    title: "Physique Moderne",
+    title: "Physique",
     description: "Mécanique et Électricité",
     thumbnail: "⚛️",
   },
   {
     id: "3",
-    title: "Histoire Africaine",
-    description: "Civilisations et Empires",
-    thumbnail: "🌍",
+    title: "Chimie",
+    description: "Chimie Organique",
+    thumbnail: "🧪",
   },
   {
     id: "4",
-    title: "Littérature Française",
-    description: "Romans et Poésie",
-    thumbnail: "📖",
+    title: "Economie",
+    description: "Micro et Macroéconomie",
+    thumbnail: "📈",
+  },
+  {
+    id: "5",
+    title: "Philosophie",
+    description: "Pensée et Raisonnement",
+    thumbnail: "🤔",
+  },
+  {
+    id: "6",
+    title: "Anglais",
+    description: "Langue et Culture",
+    thumbnail: "🇬🇧",
+  },
+  {
+    id: "7",
+    title: "Français",
+    description: "Littérature et Grammaire",
+    thumbnail: "🇫🇷",
   },
 ];
 
@@ -79,14 +98,14 @@ const MOCK_BOOKS: Book[] = [
   },
   {
     id: "3",
-    title: "Le Ventre de l'Atlantique",
-    author: "Fatou Diome",
+    title: "L'alchimiste",
+    author: "Paulo Coelho",
     thumbnail: "📘",
   },
   {
     id: "4",
-    title: "Les Soleils des Indépendances",
-    author: "Ahmadou Kourouma",
+    title: "Pensez et devenez riche",
+    author: "Napoleon Hill",
     thumbnail: "📙",
   },
 ];
@@ -94,6 +113,7 @@ const MOCK_BOOKS: Book[] = [
 export default function Contenu() {
   const router = useRouter();
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [isConnectedToKiosk, setIsConnectedToKiosk] = useState(false);
 
   const loadUserProfile = useCallback(async () => {
     try {
@@ -109,9 +129,48 @@ export default function Contenu() {
     }
   }, [router]);
 
+  const checkKioskConnection = useCallback(async () => {
+    try {
+      const netInfo = await NetInfo.fetch();
+
+      // Check if connected to WiFi
+      if (netInfo.type === "wifi" && netInfo.isConnected) {
+        // Check if SSID matches school kiosk pattern
+        // In a real app, you'd check the actual SSID
+        // For now, we'll simulate: connected = true if WiFi is on
+        const ssid = netInfo.details && 'ssid' in netInfo.details ? netInfo.details.ssid : null;
+
+        // Mock check: assume kiosk if SSID contains "ecole", "school", or "kiosk"
+        // In production, this would be the actual kiosk SSID
+        const isKiosk = ssid ?
+          (ssid.toLowerCase().includes("ecole") ||
+           ssid.toLowerCase().includes("school") ||
+           ssid.toLowerCase().includes("kiosk")) :
+          false;
+
+        setIsConnectedToKiosk(isKiosk);
+      } else {
+        setIsConnectedToKiosk(false);
+      }
+    } catch (error) {
+      console.error("Error checking kiosk connection:", error);
+      setIsConnectedToKiosk(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadUserProfile();
-  }, [loadUserProfile]);
+    checkKioskConnection();
+
+    // Subscribe to network state changes
+    const unsubscribe = NetInfo.addEventListener(() => {
+      checkKioskConnection();
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [loadUserProfile, checkKioskConnection]);
 
   const renderCourseCard = (course: Course) => (
     <TouchableOpacity
@@ -163,6 +222,12 @@ export default function Contenu() {
               de {userProfile?.schoolName}
             </Text>
           </View>
+          {isConnectedToKiosk && (
+            <View style={styles.connectionStatus}>
+              <View style={styles.connectionDot} />
+              <Text style={styles.connectionText}>Connecté au Kiosque</Text>
+            </View>
+          )}
         </View>
 
         <ScrollView
@@ -170,60 +235,82 @@ export default function Contenu() {
           contentContainerStyle={styles.contentContainer}
           showsVerticalScrollIndicator={false}
         >
-          {/* My Courses Section */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Mes Cours</Text>
-              <TouchableOpacity activeOpacity={0.7}>
-                <Text style={styles.seeAllText}>Voir tout</Text>
+          {!isConnectedToKiosk ? (
+            // Not connected state
+            <View style={styles.notConnectedContainer}>
+              <View style={styles.notConnectedIcon}>
+                <Ionicons name="wifi-outline" size={80} color="#1E3A5F" />
+              </View>
+              <Text style={styles.notConnectedTitle}>
+                Connexion requise
+              </Text>
+              <Text style={styles.notConnectedMessage}>
+                Connectez-vous au Wi-Fi de l&apos;école pour découvrir et télécharger de nouveaux contenus.
+              </Text>
+              <TouchableOpacity
+                style={styles.refreshButton}
+                onPress={checkKioskConnection}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="refresh" size={20} color="#1E3A5F" />
+                <Text style={styles.refreshButtonText}>Vérifier la connexion</Text>
               </TouchableOpacity>
             </View>
+          ) : (
+            // Connected state - show all content
+            <>
+              {/* My Courses Section */}
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>Mes Cours</Text>
+                  <TouchableOpacity activeOpacity={0.7}>
+                    <Text style={styles.seeAllText}>Voir tout</Text>
+                  </TouchableOpacity>
+                </View>
 
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.horizontalScroll}
-            >
-              {MOCK_COURSES.map(renderCourseCard)}
-            </ScrollView>
-          </View>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.horizontalScroll}
+                >
+                  {MOCK_COURSES.map(renderCourseCard)}
+                </ScrollView>
+              </View>
 
-          {/* Library Section */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Bibliothèque</Text>
-              <TouchableOpacity activeOpacity={0.7}>
-                <Text style={styles.seeAllText}>Voir tout</Text>
-              </TouchableOpacity>
-            </View>
+              {/* Library Section */}
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>Bibliothèque</Text>
+                  <TouchableOpacity activeOpacity={0.7}>
+                    <Text style={styles.seeAllText}>Voir tout</Text>
+                  </TouchableOpacity>
+                </View>
 
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.horizontalScroll}
-            >
-              {MOCK_BOOKS.map(renderBookCard)}
-            </ScrollView>
-          </View>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.horizontalScroll}
+                >
+                  {MOCK_BOOKS.map(renderBookCard)}
+                </ScrollView>
+              </View>
 
-          {/* Quick Actions */}
-          <View style={styles.quickActionsSection}>
-            <Text style={styles.quickActionsTitle}>Actions rapides</Text>
-            <View style={styles.quickActionsGrid}>
-              <TouchableOpacity style={styles.quickActionCard} activeOpacity={0.8}>
-                <Ionicons name="search" size={32} color="#1E3A5F" />
-                <Text style={styles.quickActionText}>Rechercher</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.quickActionCard} activeOpacity={0.8}>
-                <Ionicons name="star" size={32} color="#FFD700" />
-                <Text style={styles.quickActionText}>Favoris</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.quickActionCard} activeOpacity={0.8}>
-                <Ionicons name="calendar" size={32} color="#17A2B8" />
-                <Text style={styles.quickActionText}>Calendrier</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+              {/* Quick Actions */}
+              <View style={styles.quickActionsSection}>
+                <Text style={styles.quickActionsTitle}>Actions rapides</Text>
+                <View style={styles.quickActionsGrid}>
+                  <TouchableOpacity style={styles.quickActionCard} activeOpacity={0.8}>
+                    <Ionicons name="search" size={32} color="#1E3A5F" />
+                    <Text style={styles.quickActionText}>Rechercher</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.quickActionCard} activeOpacity={0.8}>
+                    <Ionicons name="star" size={32} color="#FFD700" />
+                    <Text style={styles.quickActionText}>Favoris</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </>
+          )}
         </ScrollView>
       </View>
     </>
@@ -261,6 +348,28 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "500",
     color: "#FFD700",
+  },
+  connectionStatus: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 12,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    backgroundColor: "rgba(255, 255, 255, 0.15)",
+    borderRadius: 20,
+    alignSelf: "flex-start",
+  },
+  connectionDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#4CAF50",
+    marginRight: 8,
+  },
+  connectionText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#FFFFFF",
   },
   content: {
     flex: 1,
@@ -394,5 +503,59 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#2C2C2C",
     marginTop: 8,
+  },
+  notConnectedContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 32,
+    paddingVertical: 60,
+  },
+  notConnectedIcon: {
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    backgroundColor: "#E8F4F8",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 24,
+    shadowColor: "#17A2B8",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  notConnectedTitle: {
+    fontSize: 24,
+    fontWeight: "700",
+    color: "#1E3A5F",
+    marginBottom: 16,
+    textAlign: "center",
+  },
+  notConnectedMessage: {
+    fontSize: 16,
+    color: "#5A5A5A",
+    textAlign: "center",
+    lineHeight: 24,
+    marginBottom: 32,
+  },
+  refreshButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFD700",
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    shadowColor: "#FFD700",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  refreshButtonText: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#1E3A5F",
+    marginLeft: 8,
   },
 });

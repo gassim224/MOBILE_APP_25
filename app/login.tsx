@@ -79,20 +79,12 @@ export default function Login() {
                 style={styles.headerImage}
                 resizeMode="cover"
               />
-              <View style={styles.imageOverlay}>
-                <Text style={styles.illustrationSubtext}>
-                  Black kids in Learning
-                </Text>
-              </View>
             </View>
           </View>
 
           {/* Welcome Text */}
           <View style={styles.welcomeContainer}>
             <Text style={styles.welcomeTitle}>Bonecole - votre école au bout du doigt</Text>
-            <Text style={styles.welcomeSubtitle}>
-              Connectez-vous pour commencer votre voyage d&apos;apprentissage
-            </Text>
           </View>
 
           {/* Login Form */}
@@ -183,21 +175,6 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
   },
-  imageOverlay: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: "rgba(30, 58, 95, 0.85)",
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-  },
-  illustrationSubtext: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "600",
-    textAlign: "center",
-  },
   welcomeContainer: {
     marginBottom: 32,
     alignItems: "center",
@@ -206,14 +183,7 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: "700",
     color: "#1E3A5F", // Academic Blue
-    marginBottom: 8,
     textAlign: "center",
-  },
-  welcomeSubtitle: {
-    fontSize: 16,
-    color: "#5A5A5A",
-    textAlign: "center",
-    lineHeight: 22,
   },
   formContainer: {
     marginBottom: 24,
