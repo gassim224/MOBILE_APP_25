@@ -29,18 +29,27 @@ export default function TabLayout() {
       }}
     >
       <Tabs.Screen
-        name="contenu"
+        name="accueil"
         options={{
-          title: "Contenu",
+          title: "Accueil",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="book" size={size} color={color} />
+            <Ionicons name="home" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="bibliotheque"
+        options={{
+          title: "Bibliothèque",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="library" size={size} color={color} />
           ),
         }}
       />
       <Tabs.Screen
         name="downloads"
         options={{
-          title: "Mes Téléchargements",
+          title: "Téléchargements",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="download" size={size} color={color} />
           ),
@@ -53,6 +62,13 @@ export default function TabLayout() {
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="person" size={size} color={color} />
           ),
+        }}
+      />
+      {/* Hide old contenu tab but keep the file for reference */}
+      <Tabs.Screen
+        name="contenu"
+        options={{
+          href: null, // Hide from tab bar
         }}
       />
     </Tabs>

@@ -6,8 +6,11 @@ import {
   ScrollView,
   TouchableOpacity,
 } from "react-native";
+import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
+
+type FilterTab = "cours" | "bibliotheque";
 
 interface DownloadedCourse {
   id: string;
@@ -24,39 +27,74 @@ interface Lesson {
   isCompleted: boolean;
 }
 
-// Mock data - set to empty array to show empty state, or populate to show content
-const MOCK_DOWNLOADS: DownloadedCourse[] = [
-  // Uncomment to test populated state
-  // {
-  //   id: "1",
-  //   title: "Mathématiques Avancées",
-  //   thumbnail: "📐",
-  //   downloadedAt: "Il y a 2 jours",
-  //   lessons: [
-  //     { id: "1-1", title: "Introduction à l'algèbre", duration: "15 min", isCompleted: true },
-  //     { id: "1-2", title: "Équations linéaires", duration: "20 min", isCompleted: true },
-  //     { id: "1-3", title: "Systèmes d'équations", duration: "25 min", isCompleted: false },
-  //     { id: "1-4", title: "Fonctions quadratiques", duration: "30 min", isCompleted: false },
-  //   ],
-  // },
-  // {
-  //   id: "2",
-  //   title: "Histoire Africaine",
-  //   thumbnail: "🌍",
-  //   downloadedAt: "Il y a 1 semaine",
-  //   lessons: [
-  //     { id: "2-1", title: "L'empire du Mali", duration: "18 min", isCompleted: true },
-  //     { id: "2-2", title: "Le royaume de Songhaï", duration: "22 min", isCompleted: false },
-  //     { id: "2-3", title: "Les royaumes côtiers", duration: "20 min", isCompleted: false },
-  //   ],
-  // },
+interface DownloadedBook {
+  id: string;
+  title: string;
+  author: string;
+  thumbnail: string;
+  downloadedAt: string;
+}
+
+// Mock data - populate to test different states
+const MOCK_DOWNLOADED_COURSES: DownloadedCourse[] = [
+  {
+    id: "1",
+    title: "Mathématiques Avancées",
+    thumbnail: "📐",
+    downloadedAt: "Il y a 2 jours",
+    lessons: [
+      { id: "1-1", title: "Introduction à l'algèbre", duration: "15 min", isCompleted: true },
+      { id: "1-2", title: "Équations linéaires", duration: "20 min", isCompleted: true },
+      { id: "1-3", title: "Systèmes d'équations", duration: "25 min", isCompleted: false },
+      { id: "1-4", title: "Fonctions quadratiques", duration: "30 min", isCompleted: false },
+    ],
+  },
+  {
+    id: "2",
+    title: "Histoire Africaine",
+    thumbnail: "🌍",
+    downloadedAt: "Il y a 1 semaine",
+    lessons: [
+      { id: "2-1", title: "L'empire du Mali", duration: "18 min", isCompleted: true },
+      { id: "2-2", title: "Le royaume de Songhaï", duration: "22 min", isCompleted: false },
+      { id: "2-3", title: "Les royaumes côtiers", duration: "20 min", isCompleted: false },
+    ],
+  },
+];
+
+const MOCK_DOWNLOADED_BOOKS: DownloadedBook[] = [
+  {
+    id: "1",
+    title: "Une si longue lettre",
+    author: "Mariama Bâ",
+    thumbnail: "📕",
+    downloadedAt: "Il y a 3 jours",
+  },
+  {
+    id: "2",
+    title: "L'Enfant noir",
+    author: "Camara Laye",
+    thumbnail: "📗",
+    downloadedAt: "Il y a 1 semaine",
+  },
+  {
+    id: "3",
+    title: "L'alchimiste",
+    author: "Paulo Coelho",
+    thumbnail: "📘",
+    downloadedAt: "Il y a 2 semaines",
+  },
 ];
 
 export default function Downloads() {
-  const [downloads] = useState<DownloadedCourse[]>(MOCK_DOWNLOADS);
-  const [expandedCourses, setExpandedCourses] = useState<Set<string>>(
-    new Set()
-  );
+  const router = useRouter();
+  const [activeTab, setActiveTab] = useState<FilterTab>("cours");
+  const [expandedCourses, setExpandedCourses] = useState<Set<string>>(new Set());
+
+  const downloadedCourses = MOCK_DOWNLOADED_COURSES;
+  const downloadedBooks = MOCK_DOWNLOADED_BOOKS;
+
+  const totalDownloads = downloadedCourses.length + downloadedBooks.length;
 
   const toggleCourse = (courseId: string) => {
     const newExpanded = new Set(expandedCourses);
@@ -68,39 +106,62 @@ export default function Downloads() {
     setExpandedCourses(newExpanded);
   };
 
-  const renderEmptyState = () => (
+  const renderEmptyStateCours = () => (
     <View style={styles.emptyStateContainer}>
-      {/* Illustration Placeholder */}
       <View style={styles.emptyIllustration}>
         <View style={styles.illustrationCircle}>
-          <Text style={styles.illustrationEmoji}>👨🏿‍🎓</Text>
-        </View>
-        <View style={[styles.illustrationCircle, styles.illustrationCircleSecond]}>
-          <Ionicons name="download-outline" size={48} color="#17A2B8" />
+          <Text style={styles.illustrationEmoji}>📚</Text>
         </View>
       </View>
 
-      <Text style={styles.emptyTitle}>Aucun téléchargement</Text>
+      <Text style={styles.emptyTitle}>Aucun cours téléchargé</Text>
       <Text style={styles.emptyMessage}>
-        Vous n&apos;avez aucun téléchargement pour le moment.
+        Vous n&apos;avez aucun cours téléchargé pour le moment.
       </Text>
       <Text style={styles.emptySubMessage}>
-        Parcourez vos cours et téléchargez-les pour y accéder hors ligne.
+        Découvrez et téléchargez des cours pour y accéder hors ligne.
       </Text>
 
-      <TouchableOpacity style={styles.browseButton} activeOpacity={0.8}>
-        <Ionicons name="book" size={20} color="#1E3A5F" />
-        <Text style={styles.browseButtonText}>Parcourir le contenu</Text>
+      <TouchableOpacity
+        style={styles.browseButton}
+        activeOpacity={0.8}
+        onPress={() => router.push("/(tabs)/accueil")}
+      >
+        <Ionicons name="home" size={20} color="#1E3A5F" />
+        <Text style={styles.browseButtonText}>Découvrir les cours</Text>
       </TouchableOpacity>
     </View>
   );
 
-  const renderLesson = (lesson: Lesson, courseId: string) => (
-    <TouchableOpacity
-      key={lesson.id}
-      style={styles.lessonItem}
-      activeOpacity={0.7}
-    >
+  const renderEmptyStateBibliotheque = () => (
+    <View style={styles.emptyStateContainer}>
+      <View style={styles.emptyIllustration}>
+        <View style={styles.illustrationCircle}>
+          <Text style={styles.illustrationEmoji}>📖</Text>
+        </View>
+      </View>
+
+      <Text style={styles.emptyTitle}>Aucun livre téléchargé</Text>
+      <Text style={styles.emptyMessage}>
+        Vous n&apos;avez aucun livre téléchargé pour le moment.
+      </Text>
+      <Text style={styles.emptySubMessage}>
+        Explorez notre bibliothèque et téléchargez vos livres préférés.
+      </Text>
+
+      <TouchableOpacity
+        style={styles.browseButton}
+        activeOpacity={0.8}
+        onPress={() => router.push("/(tabs)/bibliotheque")}
+      >
+        <Ionicons name="library" size={20} color="#1E3A5F" />
+        <Text style={styles.browseButtonText}>Explorer la bibliothèque</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  const renderLesson = (lesson: Lesson) => (
+    <TouchableOpacity key={lesson.id} style={styles.lessonItem} activeOpacity={0.7}>
       <View style={styles.lessonIcon}>
         <Ionicons
           name={lesson.isCompleted ? "checkmark-circle" : "play-circle-outline"}
@@ -163,12 +224,38 @@ export default function Downloads() {
         {/* Expanded Lessons */}
         {isExpanded && (
           <View style={styles.lessonsContainer}>
-            {course.lessons.map((lesson) => renderLesson(lesson, course.id))}
+            {course.lessons.map(renderLesson)}
           </View>
         )}
       </View>
     );
   };
+
+  const renderBook = (book: DownloadedBook) => (
+    <View key={book.id} style={styles.bookContainer}>
+      <View style={styles.bookCover}>
+        <Text style={styles.bookCoverEmoji}>{book.thumbnail}</Text>
+      </View>
+      <View style={styles.bookInfo}>
+        <Text style={styles.bookTitle}>{book.title}</Text>
+        <Text style={styles.bookAuthor}>{book.author}</Text>
+        <Text style={styles.bookDownloadedDate}>{book.downloadedAt}</Text>
+      </View>
+      <View style={styles.bookActions}>
+        <TouchableOpacity style={styles.bookActionButton} activeOpacity={0.7}>
+          <Ionicons name="book-outline" size={20} color="#1E3A5F" />
+          <Text style={styles.bookActionText}>Lire</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.bookActionButton, styles.deleteButton]}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="trash-outline" size={20} color="#DC3545" />
+          <Text style={[styles.bookActionText, styles.deleteText]}>Supprimer</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
 
   return (
     <>
@@ -177,23 +264,72 @@ export default function Downloads() {
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Mes Téléchargements</Text>
-          {downloads.length > 0 && (
+          {totalDownloads > 0 && (
             <Text style={styles.headerSubtitle}>
-              {downloads.length} cours téléchargé{downloads.length > 1 ? "s" : ""}
+              {totalDownloads} élément{totalDownloads > 1 ? "s" : ""} téléchargé{totalDownloads > 1 ? "s" : ""}
             </Text>
           )}
         </View>
 
+        {/* Filter Tabs */}
+        <View style={styles.tabsContainer}>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === "cours" && styles.tabActive]}
+            onPress={() => setActiveTab("cours")}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.tabEmoji}>🧩</Text>
+            <Text style={[styles.tabText, activeTab === "cours" && styles.tabTextActive]}>
+              Cours
+            </Text>
+            {downloadedCourses.length > 0 && (
+              <View style={styles.tabBadge}>
+                <Text style={styles.tabBadgeText}>{downloadedCourses.length}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.tab, activeTab === "bibliotheque" && styles.tabActive]}
+            onPress={() => setActiveTab("bibliotheque")}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.tabEmoji}>📚</Text>
+            <Text
+              style={[styles.tabText, activeTab === "bibliotheque" && styles.tabTextActive]}
+            >
+              Bibliothèque
+            </Text>
+            {downloadedBooks.length > 0 && (
+              <View style={styles.tabBadge}>
+                <Text style={styles.tabBadgeText}>{downloadedBooks.length}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
+
         {/* Content */}
-        {downloads.length === 0 ? (
-          renderEmptyState()
+        {activeTab === "cours" ? (
+          downloadedCourses.length === 0 ? (
+            renderEmptyStateCours()
+          ) : (
+            <ScrollView
+              style={styles.content}
+              contentContainerStyle={styles.contentContainer}
+              showsVerticalScrollIndicator={false}
+            >
+              {downloadedCourses.map(renderCourse)}
+            </ScrollView>
+          )
+        ) : downloadedBooks.length === 0 ? (
+          renderEmptyStateBibliotheque()
         ) : (
           <ScrollView
             style={styles.content}
             contentContainerStyle={styles.contentContainer}
             showsVerticalScrollIndicator={false}
           >
-            {downloads.map(renderCourse)}
+            {downloadedBooks.map(renderBook)}
           </ScrollView>
         )}
       </View>
@@ -225,25 +361,74 @@ const styles = StyleSheet.create({
     color: "#5A5A5A",
   },
 
+  // Tabs
+  tabsContainer: {
+    flexDirection: "row",
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    gap: 12,
+  },
+  tab: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: "#E0E0E0",
+    gap: 6,
+  },
+  tabActive: {
+    borderColor: "#1E3A5F",
+    backgroundColor: "#EBF0F5",
+  },
+  tabEmoji: {
+    fontSize: 18,
+  },
+  tabText: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#5A5A5A",
+  },
+  tabTextActive: {
+    color: "#1E3A5F",
+  },
+  tabBadge: {
+    backgroundColor: "#17A2B8",
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    minWidth: 24,
+    alignItems: "center",
+  },
+  tabBadgeText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+
   // Empty State
   emptyStateContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     paddingHorizontal: 40,
+    paddingVertical: 60,
   },
   emptyIllustration: {
     marginBottom: 32,
-    position: "relative",
-    width: 160,
-    height: 160,
+    width: 140,
+    height: 140,
     justifyContent: "center",
     alignItems: "center",
   },
   illustrationCircle: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+    width: 140,
+    height: 140,
+    borderRadius: 70,
     backgroundColor: "#1E3A5F",
     justifyContent: "center",
     alignItems: "center",
@@ -253,19 +438,8 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 6,
   },
-  illustrationCircleSecond: {
-    position: "absolute",
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: "#FFFFFF",
-    bottom: 0,
-    right: 0,
-    borderWidth: 4,
-    borderColor: "#F8F9FA",
-  },
   illustrationEmoji: {
-    fontSize: 56,
+    fontSize: 64,
   },
   emptyTitle: {
     fontSize: 24,
@@ -308,7 +482,7 @@ const styles = StyleSheet.create({
     color: "#1E3A5F",
   },
 
-  // Populated State
+  // Content (Courses)
   content: {
     flex: 1,
   },
@@ -410,5 +584,75 @@ const styles = StyleSheet.create({
   lessonDuration: {
     fontSize: 12,
     color: "#A0A0A0",
+  },
+
+  // Books
+  bookContainer: {
+    flexDirection: "row",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  bookCover: {
+    width: 60,
+    height: 80,
+    backgroundColor: "#17A2B8",
+    borderRadius: 8,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
+  },
+  bookCoverEmoji: {
+    fontSize: 32,
+  },
+  bookInfo: {
+    flex: 1,
+    justifyContent: "center",
+  },
+  bookTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#2C2C2C",
+    marginBottom: 4,
+  },
+  bookAuthor: {
+    fontSize: 14,
+    color: "#5A5A5A",
+    fontStyle: "italic",
+    marginBottom: 4,
+  },
+  bookDownloadedDate: {
+    fontSize: 12,
+    color: "#A0A0A0",
+  },
+  bookActions: {
+    justifyContent: "center",
+    gap: 8,
+  },
+  bookActionButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: "#EBF0F5",
+    borderRadius: 8,
+    gap: 6,
+  },
+  bookActionText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#1E3A5F",
+  },
+  deleteButton: {
+    backgroundColor: "#FFEBEE",
+  },
+  deleteText: {
+    color: "#DC3545",
   },
 });
