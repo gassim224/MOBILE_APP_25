@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import {
   View,
   Text,
@@ -9,8 +9,8 @@ import {
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
-import NetInfo from "@react-native-community/netinfo";
 import ConnectionStatus from "@/components/ConnectionStatus";
+import { useConnectionSimulator } from "@/contexts/ConnectionSimulatorContext";
 
 interface Lesson {
   id: string;
@@ -32,48 +32,13 @@ const MOCK_LESSONS: Lesson[] = [
 export default function CourseDetails() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  const [isConnectedToKiosk, setIsConnectedToKiosk] = useState(false);
+  const { isConnectedToKiosk } = useConnectionSimulator();
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
 
   const courseTitle = params.title as string || "Détails du cours";
   const courseDescription = params.description as string || "";
   const courseThumbnail = params.thumbnail as string || "📚";
-
-  const checkKioskConnection = useCallback(async () => {
-    try {
-      const netInfo = await NetInfo.fetch();
-
-      if (netInfo.type === "wifi" && netInfo.isConnected) {
-        const ssid = netInfo.details && 'ssid' in netInfo.details ? netInfo.details.ssid : null;
-
-        const isKiosk = ssid ?
-          (ssid.toLowerCase().includes("ecole") ||
-           ssid.toLowerCase().includes("school") ||
-           ssid.toLowerCase().includes("kiosk")) :
-          false;
-
-        setIsConnectedToKiosk(isKiosk);
-      } else {
-        setIsConnectedToKiosk(false);
-      }
-    } catch (error) {
-      console.error("Error checking kiosk connection:", error);
-      setIsConnectedToKiosk(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    checkKioskConnection();
-
-    const unsubscribe = NetInfo.addEventListener(() => {
-      checkKioskConnection();
-    });
-
-    return () => {
-      unsubscribe();
-    };
-  }, [checkKioskConnection]);
 
   const handleDownload = () => {
     setIsDownloading(true);

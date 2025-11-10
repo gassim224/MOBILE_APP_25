@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import {
   View,
   Text,
@@ -12,8 +12,8 @@ import {
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
-import NetInfo from "@react-native-community/netinfo";
 import ConnectionStatus from "@/components/ConnectionStatus";
+import { useConnectionSimulator } from "@/contexts/ConnectionSimulatorContext";
 
 interface Book {
   id: string;
@@ -96,47 +96,12 @@ const MOCK_BOOKS: Book[] = [
 
 export default function Bibliotheque() {
   const router = useRouter();
-  const [isConnectedToKiosk, setIsConnectedToKiosk] = useState(false);
+  const { isConnectedToKiosk } = useConnectionSimulator();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [downloadingBookId, setDownloadingBookId] = useState<string | null>(null);
   const [downloadedBooks, setDownloadedBooks] = useState<Set<string>>(new Set());
-
-  const checkKioskConnection = useCallback(async () => {
-    try {
-      const netInfo = await NetInfo.fetch();
-
-      if (netInfo.type === "wifi" && netInfo.isConnected) {
-        const ssid = netInfo.details && 'ssid' in netInfo.details ? netInfo.details.ssid : null;
-
-        const isKiosk = ssid ?
-          (ssid.toLowerCase().includes("ecole") ||
-           ssid.toLowerCase().includes("school") ||
-           ssid.toLowerCase().includes("kiosk")) :
-          false;
-
-        setIsConnectedToKiosk(isKiosk);
-      } else {
-        setIsConnectedToKiosk(false);
-      }
-    } catch (error) {
-      console.error("Error checking kiosk connection:", error);
-      setIsConnectedToKiosk(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    checkKioskConnection();
-
-    const unsubscribe = NetInfo.addEventListener(() => {
-      checkKioskConnection();
-    });
-
-    return () => {
-      unsubscribe();
-    };
-  }, [checkKioskConnection]);
 
   const filteredBooks = MOCK_BOOKS.filter(
     (book) =>

@@ -1,6 +1,7 @@
 import { Stack, useRouter, useSegments } from "expo-router";
 import { useEffect, useCallback } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { ConnectionSimulatorProvider } from "@/contexts/ConnectionSimulatorContext";
 
 export default function RootLayout() {
   const router = useRouter();
@@ -26,10 +27,12 @@ export default function RootLayout() {
   }, [checkAuthStatus]);
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="index" />
-      <Stack.Screen name="login" />
-      <Stack.Screen name="(tabs)" />
-    </Stack>
+    <ConnectionSimulatorProvider>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="index" />
+        <Stack.Screen name="login" />
+        <Stack.Screen name="(tabs)" />
+      </Stack>
+    </ConnectionSimulatorProvider>
   );
 }

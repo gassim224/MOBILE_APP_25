@@ -11,7 +11,7 @@ import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
-import NetInfo from "@react-native-community/netinfo";
+import { useConnectionSimulator } from "@/contexts/ConnectionSimulatorContext";
 
 interface UserProfile {
   studentName: string;
@@ -113,7 +113,7 @@ const MOCK_BOOKS: Book[] = [
 export default function Contenu() {
   const router = useRouter();
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  const [isConnectedToKiosk, setIsConnectedToKiosk] = useState(false);
+  const { isConnectedToKiosk } = useConnectionSimulator();
 
   const loadUserProfile = useCallback(async () => {
     try {
@@ -129,48 +129,9 @@ export default function Contenu() {
     }
   }, [router]);
 
-  const checkKioskConnection = useCallback(async () => {
-    try {
-      const netInfo = await NetInfo.fetch();
-
-      // Check if connected to WiFi
-      if (netInfo.type === "wifi" && netInfo.isConnected) {
-        // Check if SSID matches school kiosk pattern
-        // In a real app, you'd check the actual SSID
-        // For now, we'll simulate: connected = true if WiFi is on
-        const ssid = netInfo.details && 'ssid' in netInfo.details ? netInfo.details.ssid : null;
-
-        // Mock check: assume kiosk if SSID contains "ecole", "school", or "kiosk"
-        // In production, this would be the actual kiosk SSID
-        const isKiosk = ssid ?
-          (ssid.toLowerCase().includes("ecole") ||
-           ssid.toLowerCase().includes("school") ||
-           ssid.toLowerCase().includes("kiosk")) :
-          false;
-
-        setIsConnectedToKiosk(isKiosk);
-      } else {
-        setIsConnectedToKiosk(false);
-      }
-    } catch (error) {
-      console.error("Error checking kiosk connection:", error);
-      setIsConnectedToKiosk(false);
-    }
-  }, []);
-
   useEffect(() => {
     loadUserProfile();
-    checkKioskConnection();
-
-    // Subscribe to network state changes
-    const unsubscribe = NetInfo.addEventListener(() => {
-      checkKioskConnection();
-    });
-
-    return () => {
-      unsubscribe();
-    };
-  }, [loadUserProfile, checkKioskConnection]);
+  }, [loadUserProfile]);
 
   const renderCourseCard = (course: Course) => (
     <TouchableOpacity
@@ -249,11 +210,11 @@ export default function Contenu() {
               </Text>
               <TouchableOpacity
                 style={styles.refreshButton}
-                onPress={checkKioskConnection}
+                onPress={() => router.push("/(tabs)/profile")}
                 activeOpacity={0.8}
               >
-                <Ionicons name="refresh" size={20} color="#1E3A5F" />
-                <Text style={styles.refreshButtonText}>Vérifier la connexion</Text>
+                <Ionicons name="settings" size={20} color="#1E3A5F" />
+                <Text style={styles.refreshButtonText}>Paramètres de connexion</Text>
               </TouchableOpacity>
             </View>
           ) : (
