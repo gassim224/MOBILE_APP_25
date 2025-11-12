@@ -179,10 +179,18 @@ export default function Accueil() {
           ) : (
             // Connected state - show all courses
             <>
-              {/* Discover Courses Section */}
+              {/* My Courses Section */}
               <View style={styles.section}>
                 <View style={styles.sectionHeader}>
-                  <Text style={styles.sectionTitle}>Découvrez nos cours</Text>
+                  <Text style={styles.sectionTitle}>Mes Cours</Text>
+                  <TouchableOpacity
+                    style={styles.seeAllButton}
+                    activeOpacity={0.7}
+                    onPress={() => router.push("/all-courses")}
+                  >
+                    <Text style={styles.seeAllText}>Voir tout</Text>
+                    <Ionicons name="chevron-forward" size={16} color="#1E3A5F" />
+                  </TouchableOpacity>
                 </View>
 
                 <ScrollView
@@ -190,7 +198,49 @@ export default function Accueil() {
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={styles.horizontalScroll}
                 >
-                  {MOCK_COURSES.map(renderCourseCard)}
+                  {MOCK_COURSES.slice(0, 5).map(renderCourseCard)}
+                </ScrollView>
+              </View>
+
+              {/* Library Section */}
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>Bibliothèque</Text>
+                  <TouchableOpacity
+                    style={styles.seeAllButton}
+                    activeOpacity={0.7}
+                    onPress={() => router.push("/(tabs)/bibliotheque")}
+                  >
+                    <Text style={styles.seeAllText}>Voir tout</Text>
+                    <Ionicons name="chevron-forward" size={16} color="#1E3A5F" />
+                  </TouchableOpacity>
+                </View>
+
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.horizontalScroll}
+                >
+                  {MOCK_COURSES.slice(0, 3).map((course) => (
+                    <TouchableOpacity
+                      key={`lib-${course.id}`}
+                      style={styles.courseCard}
+                      activeOpacity={0.8}
+                      onPress={() => handleCoursePress(course)}
+                    >
+                      <View style={styles.courseThumbnail}>
+                        <Text style={styles.thumbnailEmoji}>{course.thumbnail}</Text>
+                      </View>
+                      <View style={styles.courseInfo}>
+                        <Text style={styles.courseTitle} numberOfLines={2}>
+                          {course.title}
+                        </Text>
+                        <Text style={styles.courseDescription} numberOfLines={1}>
+                          {course.description}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
                 </ScrollView>
               </View>
 
@@ -269,6 +319,20 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: "700",
     color: "#1E3A5F",
+  },
+  seeAllButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: "rgba(30, 58, 95, 0.05)",
+  },
+  seeAllText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#1E3A5F",
+    marginRight: 4,
   },
   horizontalScroll: {
     paddingHorizontal: 24,
