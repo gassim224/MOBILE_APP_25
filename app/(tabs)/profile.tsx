@@ -6,13 +6,11 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
-  Switch,
 } from "react-native";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
-import { useConnectionSimulator } from "@/contexts/ConnectionSimulatorContext";
 
 interface UserProfile {
   studentName: string;
@@ -24,12 +22,6 @@ interface UserProfile {
 export default function Profile() {
   const router = useRouter();
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  const {
-    isSimulatorEnabled,
-    simulatedConnectionState,
-    toggleSimulator,
-    setSimulatedConnectionState,
-  } = useConnectionSimulator();
 
   const loadUserProfile = useCallback(async () => {
     try {
@@ -179,57 +171,6 @@ export default function Profile() {
                 <Text style={styles.statValue}>28h</Text>
                 <Text style={styles.statLabel}>Temps d&apos;étude</Text>
               </View>
-            </View>
-          </View>
-
-          {/* Developer Tools */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Outils de développement</Text>
-
-            <View style={styles.devToolsCard}>
-              <View style={styles.devToolRow}>
-                <View style={styles.devToolInfo}>
-                  <View style={styles.devToolHeader}>
-                    <View style={styles.devToolIconContainer}>
-                      <Ionicons name="construct" size={20} color="#FF6B6B" />
-                    </View>
-                    <Text style={styles.devToolLabel}>Simuler la connexion au kiosque</Text>
-                  </View>
-                  <Text style={styles.devToolStatus}>
-                    {isSimulatorEnabled
-                      ? (simulatedConnectionState ? "🟢 En ligne" : "🔴 Hors ligne")
-                      : "Désactivé (connexion réelle)"}
-                  </Text>
-                </View>
-                <Switch
-                  value={isSimulatorEnabled}
-                  onValueChange={toggleSimulator}
-                  trackColor={{ false: "#E0E0E0", true: "#4CAF50" }}
-                  thumbColor={isSimulatorEnabled ? "#FFFFFF" : "#F4F3F4"}
-                  ios_backgroundColor="#E0E0E0"
-                />
-              </View>
-
-              {isSimulatorEnabled && (
-                <>
-                  <View style={styles.devToolDivider} />
-                  <View style={styles.devToolRow}>
-                    <View style={styles.devToolInfo}>
-                      <Text style={styles.devToolSubLabel}>État de connexion simulé</Text>
-                      <Text style={styles.devToolSubStatus}>
-                        {simulatedConnectionState ? "En ligne" : "Hors ligne"}
-                      </Text>
-                    </View>
-                    <Switch
-                      value={simulatedConnectionState}
-                      onValueChange={setSimulatedConnectionState}
-                      trackColor={{ false: "#DC3545", true: "#4CAF50" }}
-                      thumbColor="#FFFFFF"
-                      ios_backgroundColor="#DC3545"
-                    />
-                  </View>
-                </>
-              )}
             </View>
           </View>
 
@@ -471,69 +412,5 @@ const styles = StyleSheet.create({
     color: "#A0A0A0",
     textAlign: "center",
     marginTop: 20,
-  },
-  devToolsCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 4,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
-    borderWidth: 2,
-    borderColor: "#FF6B6B",
-  },
-  devToolRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: 16,
-  },
-  devToolInfo: {
-    flex: 1,
-    marginRight: 12,
-  },
-  devToolHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 6,
-  },
-  devToolIconContainer: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: "#FFE5E5",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 10,
-  },
-  devToolLabel: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#2C2C2C",
-    flex: 1,
-  },
-  devToolStatus: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#5A5A5A",
-    marginLeft: 42,
-  },
-  devToolDivider: {
-    height: 1,
-    backgroundColor: "#FFE5E5",
-    marginHorizontal: 16,
-  },
-  devToolSubLabel: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#2C2C2C",
-    marginBottom: 4,
-  },
-  devToolSubStatus: {
-    fontSize: 13,
-    fontWeight: "500",
-    color: "#5A5A5A",
   },
 });

@@ -16,8 +16,8 @@ const SIMULATOR_ENABLED_KEY = "@connection_simulator_enabled";
 const SIMULATED_STATE_KEY = "@connection_simulated_state";
 
 export function ConnectionSimulatorProvider({ children }: { children: ReactNode }) {
-  const [isSimulatorEnabled, setIsSimulatorEnabled] = useState(false);
-  const [simulatedConnectionState, setSimulatedConnectionStateInternal] = useState(false);
+  const [isSimulatorEnabled, setIsSimulatorEnabled] = useState(true); // Always enabled for development
+  const [simulatedConnectionState, setSimulatedConnectionStateInternal] = useState(true); // Default to online
   const [realConnectionState, setRealConnectionState] = useState(false);
 
   // Load simulator settings from storage
