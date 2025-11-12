@@ -11,9 +11,9 @@ export default function RootLayout() {
     try {
       const sessionToken = await AsyncStorage.getItem("sessionToken");
 
-      // If we're on the login screen and have a token, navigate to tabs
+      // If we're on the login screen and have a token, navigate to main Home Screen
       if (sessionToken && segments[0] !== "(tabs)") {
-        router.replace("/(tabs)/contenu");
+        router.replace("/(tabs)/accueil");
       } else if (!sessionToken && segments[0] === "(tabs)") {
         router.replace("/login");
       }
@@ -32,6 +32,8 @@ export default function RootLayout() {
         <Stack.Screen name="index" />
         <Stack.Screen name="login" />
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="course-detail" />
+        <Stack.Screen name="all-courses" />
       </Stack>
     </ConnectionSimulatorProvider>
   );

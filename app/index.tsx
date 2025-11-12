@@ -13,7 +13,7 @@ export default function Index() {
       // Add a small delay for smoother transition
       setTimeout(() => {
         if (sessionToken) {
-          router.replace("/(tabs)/contenu");
+          router.replace("/(tabs)/accueil");
         } else {
           router.replace("/login");
         }

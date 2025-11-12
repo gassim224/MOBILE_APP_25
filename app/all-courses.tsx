@@ -85,7 +85,7 @@ export default function AllCourses() {
 
   const handleCoursePress = (course: Course) => {
     router.push({
-      pathname: "/course-details",
+      pathname: "/course-detail",
       params: {
         id: course.id,
         title: course.title,
