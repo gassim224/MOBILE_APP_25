@@ -150,7 +150,7 @@ const MOCK_RECENT_ACTIVITIES: RecentActivity[] = [
   },
 ];
 
-export default function Accueil() {
+export default function Home() {
   const router = useRouter();
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);

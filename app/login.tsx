@@ -49,9 +49,9 @@ export default function Login() {
       await AsyncStorage.setItem("sessionToken", sessionToken);
       await AsyncStorage.setItem("userProfile", JSON.stringify(userProfile));
 
-      // Navigate to main Home Screen (Accueil) with smooth transition
+      // Navigate to main Home Screen with smooth transition
       setTimeout(() => {
-        router.replace("/(tabs)/accueil");
+        router.replace("/home");
       }, 200);
     } catch (error) {
       console.error("Login error:", error);

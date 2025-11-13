@@ -29,11 +29,11 @@ export default function TabLayout() {
       }}
     >
       <Tabs.Screen
-        name="accueil"
+        name="cours"
         options={{
-          title: "Accueil",
+          title: "Cours",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="home" size={size} color={color} />
+            <Ionicons name="grid" size={size} color={color} />
           ),
         }}
       />
