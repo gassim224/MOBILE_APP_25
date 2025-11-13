@@ -64,13 +64,6 @@ export default function TabLayout() {
           ),
         }}
       />
-      {/* Hide old contenu tab but keep the file for reference */}
-      <Tabs.Screen
-        name="contenu"
-        options={{
-          href: null, // Hide from tab bar
-        }}
-      />
     </Tabs>
   );
 }

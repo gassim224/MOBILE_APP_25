@@ -32,8 +32,8 @@ export default function RootLayout() {
         <Stack.Screen name="index" />
         <Stack.Screen name="login" />
         <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="course-detail" />
-        <Stack.Screen name="all-courses" />
+        <Stack.Screen name="course-detail" options={{ presentation: "card" }} />
+        <Stack.Screen name="all-courses" options={{ presentation: "card" }} />
       </Stack>
     </ConnectionSimulatorProvider>
   );
