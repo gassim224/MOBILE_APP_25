@@ -5,6 +5,8 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  ImageBackground,
+  Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -90,9 +92,8 @@ export default function Downloads() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<FilterTab>("cours");
   const [expandedCourses, setExpandedCourses] = useState<Set<string>>(new Set());
-
-  const downloadedCourses = MOCK_DOWNLOADED_COURSES;
-  const downloadedBooks = MOCK_DOWNLOADED_BOOKS;
+  const [downloadedCourses, setDownloadedCourses] = useState<DownloadedCourse[]>(MOCK_DOWNLOADED_COURSES);
+  const [downloadedBooks, setDownloadedBooks] = useState<DownloadedBook[]>(MOCK_DOWNLOADED_BOOKS);
 
   const totalDownloads = downloadedCourses.length + downloadedBooks.length;
 
@@ -104,6 +105,58 @@ export default function Downloads() {
       newExpanded.add(courseId);
     }
     setExpandedCourses(newExpanded);
+  };
+
+  const handleDeleteCourse = (courseId: string, courseTitle: string) => {
+    Alert.alert(
+      "Supprimer le cours",
+      "Voulez-vous vraiment supprimer ce cours ? Tous les fichiers associés seront effacés de votre appareil.",
+      [
+        {
+          text: "Annuler",
+          style: "cancel",
+        },
+        {
+          text: "Supprimer",
+          style: "destructive",
+          onPress: () => {
+            // Remove course from state
+            setDownloadedCourses((prevCourses) =>
+              prevCourses.filter((course) => course.id !== courseId)
+            );
+            // Remove from expanded set if it was expanded
+            setExpandedCourses((prev) => {
+              const newSet = new Set(prev);
+              newSet.delete(courseId);
+              return newSet;
+            });
+          },
+        },
+      ]
+    );
+  };
+
+  const handleDeleteBook = (bookId: string, bookTitle: string) => {
+    Alert.alert(
+      "Supprimer le livre",
+      "Voulez-vous vraiment supprimer ce livre ? Il sera effacé de votre appareil.",
+      [
+        {
+          text: "Annuler",
+          style: "cancel",
+        },
+        {
+          text: "Supprimer",
+          style: "destructive",
+          onPress: () => {
+            // Remove book from state
+            setDownloadedBooks((prevBooks) =>
+              prevBooks.filter((book) => book.id !== bookId)
+            );
+          },
+        },
+      ]
+    );
   };
 
   const renderEmptyStateCours = () => (
@@ -192,34 +245,46 @@ export default function Downloads() {
 
     return (
       <View key={course.id} style={styles.courseContainer}>
-        <TouchableOpacity
-          style={styles.courseHeader}
-          onPress={() => toggleCourse(course.id)}
-          activeOpacity={0.8}
-        >
-          <View style={styles.courseThumbnail}>
-            <Text style={styles.courseThumbnailEmoji}>{course.thumbnail}</Text>
-          </View>
-
-          <View style={styles.courseHeaderInfo}>
-            <Text style={styles.courseTitle}>{course.title}</Text>
-            <Text style={styles.courseStats}>
-              {completedLessons}/{totalLessons} leçons complétées
-            </Text>
-            <Text style={styles.downloadedDate}>{course.downloadedAt}</Text>
-
-            {/* Progress Bar */}
-            <View style={styles.progressBarContainer}>
-              <View style={[styles.progressBar, { width: `${progress}%` }]} />
+        <View style={styles.courseHeaderWrapper}>
+          <TouchableOpacity
+            style={styles.courseHeader}
+            onPress={() => toggleCourse(course.id)}
+            activeOpacity={0.8}
+          >
+            <View style={styles.courseThumbnail}>
+              <Text style={styles.courseThumbnailEmoji}>{course.thumbnail}</Text>
             </View>
-          </View>
 
-          <Ionicons
-            name={isExpanded ? "chevron-up" : "chevron-down"}
-            size={24}
-            color="#5A5A5A"
-          />
-        </TouchableOpacity>
+            <View style={styles.courseHeaderInfo}>
+              <Text style={styles.courseTitle}>{course.title}</Text>
+              <Text style={styles.courseStats}>
+                {completedLessons}/{totalLessons} leçons complétées
+              </Text>
+              <Text style={styles.downloadedDate}>{course.downloadedAt}</Text>
+
+              {/* Progress Bar */}
+              <View style={styles.progressBarContainer}>
+                <View style={[styles.progressBar, { width: `${progress}%` }]} />
+              </View>
+            </View>
+
+            <Ionicons
+              name={isExpanded ? "chevron-up" : "chevron-down"}
+              size={24}
+              color="#5A5A5A"
+            />
+          </TouchableOpacity>
+
+          {/* Delete Button */}
+          <TouchableOpacity
+            style={styles.courseDeleteButton}
+            onPress={() => handleDeleteCourse(course.id, course.title)}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="trash-outline" size={20} color="#DC3545" />
+            <Text style={styles.courseDeleteText}>Supprimer</Text>
+          </TouchableOpacity>
+        </View>
 
         {/* Expanded Lessons */}
         {isExpanded && (
@@ -248,6 +313,7 @@ export default function Downloads() {
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.bookActionButton, styles.deleteButton]}
+          onPress={() => handleDeleteBook(book.id, book.title)}
           activeOpacity={0.7}
         >
           <Ionicons name="trash-outline" size={20} color="#DC3545" />
@@ -259,17 +325,25 @@ export default function Downloads() {
 
   return (
     <>
-      <StatusBar style="dark" />
+      <StatusBar style="light" />
       <View style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Mes Téléchargements</Text>
-          {totalDownloads > 0 && (
-            <Text style={styles.headerSubtitle}>
-              {totalDownloads} élément{totalDownloads > 1 ? "s" : ""} téléchargé{totalDownloads > 1 ? "s" : ""}
-            </Text>
-          )}
-        </View>
+        {/* Header with Image Background */}
+        <ImageBackground
+          source={require("@/assets/images/login-header.png")}
+          style={styles.headerBackground}
+          imageStyle={styles.headerBackgroundImage}
+        >
+          <View style={styles.headerOverlay}>
+            <View style={styles.header}>
+              <Text style={styles.headerTitle}>Mes Téléchargements</Text>
+              {totalDownloads > 0 && (
+                <Text style={styles.headerSubtitle}>
+                  {totalDownloads} élément{totalDownloads > 1 ? "s" : ""} téléchargé{totalDownloads > 1 ? "s" : ""}
+                </Text>
+              )}
+            </View>
+          </View>
+        </ImageBackground>
 
         {/* Filter Tabs */}
         <View style={styles.tabsContainer}>
@@ -342,23 +416,37 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#F8F9FA",
   },
+  headerBackground: {
+    width: "100%",
+  },
+  headerBackgroundImage: {
+    resizeMode: "cover",
+  },
+  headerOverlay: {
+    backgroundColor: "rgba(30, 58, 95, 0.75)", // Academic Blue with 75% opacity
+    width: "100%",
+  },
   header: {
-    backgroundColor: "#FFFFFF",
     paddingTop: 60,
     paddingBottom: 20,
     paddingHorizontal: 24,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
   },
   headerTitle: {
     fontSize: 32,
     fontWeight: "700",
-    color: "#1E3A5F",
+    color: "#FFFFFF",
     marginBottom: 4,
+    textShadowColor: "rgba(0, 0, 0, 0.3)",
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
   },
   headerSubtitle: {
     fontSize: 14,
-    color: "#5A5A5A",
+    color: "#FFFFFF",
+    opacity: 0.95,
+    textShadowColor: "rgba(0, 0, 0, 0.2)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
 
   // Tabs
@@ -501,10 +589,31 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
   },
+  courseHeaderWrapper: {
+    flexDirection: "column",
+  },
   courseHeader: {
     flexDirection: "row",
     padding: 16,
+    paddingBottom: 12,
     alignItems: "center",
+  },
+  courseDeleteButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginHorizontal: 16,
+    marginBottom: 12,
+    backgroundColor: "#FFEBEE",
+    borderRadius: 8,
+    gap: 6,
+  },
+  courseDeleteText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#DC3545",
   },
   courseThumbnail: {
     width: 60,
