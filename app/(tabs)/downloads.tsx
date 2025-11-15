@@ -125,7 +125,7 @@ export default function Downloads() {
       <TouchableOpacity
         style={styles.browseButton}
         activeOpacity={0.8}
-        onPress={() => router.push("/home")}
+        onPress={() => router.push("/(tabs)")}
       >
         <Ionicons name="home" size={20} color="#1E3A5F" />
         <Text style={styles.browseButtonText}>Découvrir les cours</Text>

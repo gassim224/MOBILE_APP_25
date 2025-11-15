@@ -11,10 +11,10 @@ export default function RootLayout() {
     try {
       const sessionToken = await AsyncStorage.getItem("sessionToken");
 
-      // If we're on the login screen and have a token, navigate to main Home Screen
-      if (sessionToken && segments[0] !== "(tabs)" && segments[0] !== "home") {
-        router.replace("/home");
-      } else if (!sessionToken && (segments[0] === "(tabs)" || segments[0] === "home")) {
+      // If we're on the login screen and have a token, navigate to tabs
+      if (sessionToken && segments[0] !== "(tabs)") {
+        router.replace("/(tabs)");
+      } else if (!sessionToken && segments[0] === "(tabs)") {
         router.replace("/login");
       }
     } catch (error) {
@@ -31,7 +31,6 @@ export default function RootLayout() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="login" />
-        <Stack.Screen name="home" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="course-detail" options={{ presentation: "card" }} />
         <Stack.Screen name="all-courses" options={{ presentation: "card" }} />
