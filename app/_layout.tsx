@@ -11,10 +11,13 @@ export default function RootLayout() {
     try {
       const sessionToken = await AsyncStorage.getItem("sessionToken");
 
-      // If we're on the login screen and have a token, navigate to tabs
-      if (sessionToken && segments[0] !== "(tabs)") {
+      const inAuthGroup = segments[0] === "(tabs)" || segments[0] === "course-detail" || segments[0] === "all-courses";
+
+      // If we're on the login/index screen and have a token, navigate to tabs
+      if (sessionToken && segments[0] === "login") {
         router.replace("/(tabs)");
-      } else if (!sessionToken && segments[0] === "(tabs)") {
+      } else if (!sessionToken && inAuthGroup) {
+        // If no token and trying to access protected routes, go to login
         router.replace("/login");
       }
     } catch (error) {

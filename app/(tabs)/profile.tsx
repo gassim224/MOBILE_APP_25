@@ -101,7 +101,7 @@ export default function Profile() {
                   <Ionicons name="person" size={20} color="#1E3A5F" />
                 </View>
                 <View style={styles.infoTextContainer}>
-                  <Text style={styles.infoLabel}>Nom de l&apos;étudiant</Text>
+                  <Text style={styles.infoLabel}>Nom de l&apos;élève</Text>
                   <Text style={styles.infoValue}>{userProfile.studentName}</Text>
                 </View>
               </View>
@@ -137,7 +137,7 @@ export default function Profile() {
                   <Ionicons name="card" size={20} color="#5A5A5A" />
                 </View>
                 <View style={styles.infoTextContainer}>
-                  <Text style={styles.infoLabel}>ID Étudiant</Text>
+                  <Text style={styles.infoLabel}>ID Élève</Text>
                   <Text style={styles.infoValue}>{userProfile.studentId}</Text>
                 </View>
               </View>
@@ -171,36 +171,15 @@ export default function Profile() {
                 <Text style={styles.statValue}>28h</Text>
                 <Text style={styles.statLabel}>Temps d&apos;étude</Text>
               </View>
+
+              <View style={styles.statCard}>
+                <View style={styles.statIconContainer}>
+                  <Ionicons name="book-outline" size={28} color="#28A745" />
+                </View>
+                <Text style={styles.statValue}>4</Text>
+                <Text style={styles.statLabel}>Livres lus</Text>
+              </View>
             </View>
-          </View>
-
-          {/* Settings Options */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Paramètres</Text>
-
-            <TouchableOpacity style={styles.optionCard} activeOpacity={0.7}>
-              <View style={styles.optionIconContainer}>
-                <Ionicons name="notifications" size={22} color="#1E3A5F" />
-              </View>
-              <Text style={styles.optionText}>Notifications</Text>
-              <Ionicons name="chevron-forward" size={20} color="#A0A0A0" />
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.optionCard} activeOpacity={0.7}>
-              <View style={styles.optionIconContainer}>
-                <Ionicons name="language" size={22} color="#17A2B8" />
-              </View>
-              <Text style={styles.optionText}>Langue</Text>
-              <Ionicons name="chevron-forward" size={20} color="#A0A0A0" />
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.optionCard} activeOpacity={0.7}>
-              <View style={styles.optionIconContainer}>
-                <Ionicons name="help-circle" size={22} color="#5A5A5A" />
-              </View>
-              <Text style={styles.optionText}>Aide et support</Text>
-              <Ionicons name="chevron-forward" size={20} color="#A0A0A0" />
-            </TouchableOpacity>
           </View>
 
           {/* Logout Button */}
@@ -331,10 +310,11 @@ const styles = StyleSheet.create({
   },
   statsGrid: {
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: 12,
   },
   statCard: {
-    flex: 1,
+    width: "48%",
     backgroundColor: "#FFFFFF",
     borderRadius: 12,
     padding: 16,
@@ -358,34 +338,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#5A5A5A",
     textAlign: "center",
-  },
-  optionCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  optionIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    backgroundColor: "#F8F9FA",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 12,
-  },
-  optionText: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#2C2C2C",
   },
   logoutButton: {
     flexDirection: "row",
