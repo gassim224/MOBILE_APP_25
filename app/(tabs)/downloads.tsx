@@ -27,6 +27,8 @@ interface Lesson {
   title: string;
   duration: string;
   isCompleted: boolean;
+  type: 'video' | 'audio' | 'pdf';
+  mediaUrl?: string;
 }
 
 interface DownloadedBook {
@@ -35,6 +37,7 @@ interface DownloadedBook {
   author: string;
   thumbnail: string;
   downloadedAt: string;
+  pdfUrl?: string;
 }
 
 // Mock data - populate to test different states
@@ -45,10 +48,38 @@ const MOCK_DOWNLOADED_COURSES: DownloadedCourse[] = [
     thumbnail: "📐",
     downloadedAt: "Il y a 2 jours",
     lessons: [
-      { id: "1-1", title: "Introduction à l'algèbre", duration: "15 min", isCompleted: true },
-      { id: "1-2", title: "Équations linéaires", duration: "20 min", isCompleted: true },
-      { id: "1-3", title: "Systèmes d'équations", duration: "25 min", isCompleted: false },
-      { id: "1-4", title: "Fonctions quadratiques", duration: "30 min", isCompleted: false },
+      {
+        id: "1-1",
+        title: "Introduction à l'algèbre",
+        duration: "15 min",
+        isCompleted: true,
+        type: 'video',
+        mediaUrl: 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+      },
+      {
+        id: "1-2",
+        title: "Équations linéaires",
+        duration: "20 min",
+        isCompleted: true,
+        type: 'video',
+        mediaUrl: 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
+      },
+      {
+        id: "1-3",
+        title: "Systèmes d'équations",
+        duration: "25 min",
+        isCompleted: false,
+        type: 'audio',
+        mediaUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
+      },
+      {
+        id: "1-4",
+        title: "Fonctions quadratiques - Guide PDF",
+        duration: "30 min",
+        isCompleted: false,
+        type: 'pdf',
+        mediaUrl: 'http://www.pdf995.com/samples/pdf.pdf',
+      },
     ],
   },
   {
@@ -57,9 +88,30 @@ const MOCK_DOWNLOADED_COURSES: DownloadedCourse[] = [
     thumbnail: "🌍",
     downloadedAt: "Il y a 1 semaine",
     lessons: [
-      { id: "2-1", title: "L'empire du Mali", duration: "18 min", isCompleted: true },
-      { id: "2-2", title: "Le royaume de Songhaï", duration: "22 min", isCompleted: false },
-      { id: "2-3", title: "Les royaumes côtiers", duration: "20 min", isCompleted: false },
+      {
+        id: "2-1",
+        title: "L'empire du Mali",
+        duration: "18 min",
+        isCompleted: true,
+        type: 'video',
+        mediaUrl: 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+      },
+      {
+        id: "2-2",
+        title: "Le royaume de Songhaï",
+        duration: "22 min",
+        isCompleted: false,
+        type: 'audio',
+        mediaUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
+      },
+      {
+        id: "2-3",
+        title: "Les royaumes côtiers - Documentation",
+        duration: "20 min",
+        isCompleted: false,
+        type: 'pdf',
+        mediaUrl: 'http://www.pdf995.com/samples/pdf.pdf',
+      },
     ],
   },
 ];
@@ -71,6 +123,7 @@ const MOCK_DOWNLOADED_BOOKS: DownloadedBook[] = [
     author: "Mariama Bâ",
     thumbnail: "📕",
     downloadedAt: "Il y a 3 jours",
+    pdfUrl: 'http://www.pdf995.com/samples/pdf.pdf',
   },
   {
     id: "2",
@@ -78,6 +131,7 @@ const MOCK_DOWNLOADED_BOOKS: DownloadedBook[] = [
     author: "Camara Laye",
     thumbnail: "📗",
     downloadedAt: "Il y a 1 semaine",
+    pdfUrl: 'http://www.pdf995.com/samples/pdf.pdf',
   },
   {
     id: "3",
@@ -85,6 +139,7 @@ const MOCK_DOWNLOADED_BOOKS: DownloadedBook[] = [
     author: "Paulo Coelho",
     thumbnail: "📘",
     downloadedAt: "Il y a 2 semaines",
+    pdfUrl: 'http://www.pdf995.com/samples/pdf.pdf',
   },
 ];
 
@@ -213,13 +268,63 @@ export default function Downloads() {
     </View>
   );
 
+  const handleLessonPress = (lesson: Lesson) => {
+    if (lesson.type === 'video') {
+      router.push({
+        pathname: '/(modals)/video-player',
+        params: {
+          lessonId: lesson.id,
+          lessonTitle: lesson.title,
+          videoUrl: lesson.mediaUrl || '',
+        },
+      });
+    } else if (lesson.type === 'audio') {
+      router.push({
+        pathname: '/(modals)/audio-player',
+        params: {
+          lessonId: lesson.id,
+          lessonTitle: lesson.title,
+          audioUrl: lesson.mediaUrl || '',
+        },
+      });
+    } else if (lesson.type === 'pdf') {
+      router.push({
+        pathname: '/(modals)/pdf-reader',
+        params: {
+          itemId: lesson.id,
+          itemTitle: lesson.title,
+          pdfUrl: lesson.mediaUrl || '',
+          itemType: 'lesson',
+        },
+      });
+    }
+  };
+
+  const getMediaIcon = (type: 'video' | 'audio' | 'pdf') => {
+    switch (type) {
+      case 'video':
+        return 'play-circle';
+      case 'audio':
+        return 'musical-notes';
+      case 'pdf':
+        return 'document-text';
+      default:
+        return 'play-circle-outline';
+    }
+  };
+
   const renderLesson = (lesson: Lesson) => (
-    <TouchableOpacity key={lesson.id} style={styles.lessonItem} activeOpacity={0.7}>
+    <TouchableOpacity
+      key={lesson.id}
+      style={styles.lessonItem}
+      activeOpacity={0.7}
+      onPress={() => handleLessonPress(lesson)}
+    >
       <View style={styles.lessonIcon}>
         <Ionicons
-          name={lesson.isCompleted ? "checkmark-circle" : "play-circle-outline"}
+          name={lesson.isCompleted ? "checkmark-circle" : getMediaIcon(lesson.type)}
           size={24}
-          color={lesson.isCompleted ? "#17A2B8" : "#5A5A5A"}
+          color={lesson.isCompleted ? "#17A2B8" : "#FFD700"}
         />
       </View>
       <View style={styles.lessonInfo}>
@@ -231,7 +336,14 @@ export default function Downloads() {
         >
           {lesson.title}
         </Text>
-        <Text style={styles.lessonDuration}>{lesson.duration}</Text>
+        <View style={styles.lessonMeta}>
+          <Text style={styles.lessonDuration}>{lesson.duration}</Text>
+          <View style={styles.lessonTypeBadge}>
+            <Text style={styles.lessonTypeText}>
+              {lesson.type === 'video' ? '🎥 Vidéo' : lesson.type === 'audio' ? '🎵 Audio' : '📄 PDF'}
+            </Text>
+          </View>
+        </View>
       </View>
       <Ionicons name="chevron-forward" size={20} color="#A0A0A0" />
     </TouchableOpacity>
@@ -296,6 +408,18 @@ export default function Downloads() {
     );
   };
 
+  const handleBookRead = (book: DownloadedBook) => {
+    router.push({
+      pathname: '/(modals)/pdf-reader',
+      params: {
+        itemId: book.id,
+        itemTitle: book.title,
+        pdfUrl: book.pdfUrl || '',
+        itemType: 'book',
+      },
+    });
+  };
+
   const renderBook = (book: DownloadedBook) => (
     <View key={book.id} style={styles.bookContainer}>
       <View style={styles.bookCover}>
@@ -307,7 +431,11 @@ export default function Downloads() {
         <Text style={styles.bookDownloadedDate}>{book.downloadedAt}</Text>
       </View>
       <View style={styles.bookActions}>
-        <TouchableOpacity style={styles.bookActionButton} activeOpacity={0.7}>
+        <TouchableOpacity
+          style={styles.bookActionButton}
+          activeOpacity={0.7}
+          onPress={() => handleBookRead(book)}
+        >
           <Ionicons name="book-outline" size={20} color="#1E3A5F" />
           <Text style={styles.bookActionText}>Lire</Text>
         </TouchableOpacity>
@@ -685,14 +813,30 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     color: "#2C2C2C",
-    marginBottom: 2,
+    marginBottom: 4,
   },
   lessonTitleCompleted: {
     color: "#5A5A5A",
   },
+  lessonMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
   lessonDuration: {
     fontSize: 12,
     color: "#A0A0A0",
+  },
+  lessonTypeBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    backgroundColor: "#EBF0F5",
+    borderRadius: 4,
+  },
+  lessonTypeText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#1E3A5F",
   },
 
   // Books

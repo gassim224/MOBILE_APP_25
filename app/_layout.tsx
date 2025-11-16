@@ -37,6 +37,27 @@ export default function RootLayout() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="course-detail" options={{ presentation: "card" }} />
         <Stack.Screen name="all-courses" options={{ presentation: "card" }} />
+        <Stack.Screen
+          name="(modals)/video-player"
+          options={{
+            presentation: "fullScreenModal",
+            animation: "fade",
+          }}
+        />
+        <Stack.Screen
+          name="(modals)/audio-player"
+          options={{
+            presentation: "fullScreenModal",
+            animation: "fade",
+          }}
+        />
+        <Stack.Screen
+          name="(modals)/pdf-reader"
+          options={{
+            presentation: "fullScreenModal",
+            animation: "slide_from_bottom",
+          }}
+        />
       </Stack>
     </ConnectionSimulatorProvider>
   );
