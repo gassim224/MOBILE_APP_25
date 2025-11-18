@@ -11,6 +11,7 @@ import {
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
+import { SAMPLE_PDF_URL } from "@/constants/SampleData";
 
 type FilterTab = "cours" | "bibliotheque";
 
@@ -78,7 +79,7 @@ const MOCK_DOWNLOADED_COURSES: DownloadedCourse[] = [
         duration: "30 min",
         isCompleted: false,
         type: 'pdf',
-        mediaUrl: 'http://www.pdf995.com/samples/pdf.pdf',
+        mediaUrl: SAMPLE_PDF_URL,
       },
     ],
   },
@@ -110,7 +111,7 @@ const MOCK_DOWNLOADED_COURSES: DownloadedCourse[] = [
         duration: "20 min",
         isCompleted: false,
         type: 'pdf',
-        mediaUrl: 'http://www.pdf995.com/samples/pdf.pdf',
+        mediaUrl: SAMPLE_PDF_URL,
       },
     ],
   },
@@ -123,7 +124,7 @@ const MOCK_DOWNLOADED_BOOKS: DownloadedBook[] = [
     author: "Mariama Bâ",
     thumbnail: "📕",
     downloadedAt: "Il y a 3 jours",
-    pdfUrl: 'http://www.pdf995.com/samples/pdf.pdf',
+    pdfUrl: SAMPLE_PDF_URL,
   },
   {
     id: "2",
@@ -131,7 +132,7 @@ const MOCK_DOWNLOADED_BOOKS: DownloadedBook[] = [
     author: "Camara Laye",
     thumbnail: "📗",
     downloadedAt: "Il y a 1 semaine",
-    pdfUrl: 'http://www.pdf995.com/samples/pdf.pdf',
+    pdfUrl: SAMPLE_PDF_URL,
   },
   {
     id: "3",
@@ -139,7 +140,7 @@ const MOCK_DOWNLOADED_BOOKS: DownloadedBook[] = [
     author: "Paulo Coelho",
     thumbnail: "📘",
     downloadedAt: "Il y a 2 semaines",
-    pdfUrl: 'http://www.pdf995.com/samples/pdf.pdf',
+    pdfUrl: SAMPLE_PDF_URL,
   },
 ];
 

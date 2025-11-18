@@ -13,6 +13,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { progressStorage, MediaProgress } from '@/utils/progressStorage';
+import { SAMPLE_PDF_URL } from '@/constants/SampleData';
 
 // Conditionally import react-native-pdf only for native platforms
 let Pdf: any = null;
@@ -133,8 +134,8 @@ export default function PdfReader() {
     setShowHeader(!showHeader);
   };
 
-  // Use a demo PDF URL
-  const demoPdfUrl = pdfUrl || 'http://www.pdf995.com/samples/pdf.pdf';
+  // Use the sample PDF URL - always use the same demo PDF for consistency
+  const demoPdfUrl = pdfUrl || SAMPLE_PDF_URL;
 
   // Web fallback view
   if (Platform.OS === 'web') {

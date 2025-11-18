@@ -14,6 +14,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useConnectionSimulator } from "@/contexts/ConnectionSimulatorContext";
+import { SAMPLE_PDF_URL } from "@/constants/SampleData";
 
 interface UserProfile {
   studentName: string;
@@ -204,8 +205,16 @@ export default function Home() {
         },
       });
     } else {
-      // Navigate to book reader (only if downloaded - will implement later)
-      console.log("Open book:", activity.title);
+      // Navigate to book reader - open PDF for downloaded eBooks
+      router.push({
+        pathname: "/(modals)/pdf-reader",
+        params: {
+          itemId: activity.id,
+          itemTitle: activity.title,
+          pdfUrl: SAMPLE_PDF_URL,
+          itemType: "book",
+        },
+      });
     }
   };
 
