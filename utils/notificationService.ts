@@ -261,3 +261,103 @@ export async function getAllScheduledNotifications(): Promise<Notifications.Noti
     return [];
   }
 }
+
+// ============================================================================
+// TESTING & DEBUGGING FUNCTIONS
+// ============================================================================
+
+/**
+ * Test function: Schedule inactivity notification with 5-second delay
+ */
+export async function testInactivityNotification(): Promise<void> {
+  try {
+    const { status } = await Notifications.getPermissionsAsync();
+    if (status !== 'granted') {
+      console.log('Notification permissions not granted');
+      return;
+    }
+
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "On dirait que vous nous avez manqué ! 🎓",
+        body: "Revenez continuer votre apprentissage.",
+        sound: true,
+        priority: Notifications.AndroidNotificationPriority.HIGH,
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+        seconds: 5, // 5 seconds for testing
+        repeats: false,
+      },
+    });
+
+    console.log('Test inactivity notification scheduled for 5 seconds');
+  } catch (error) {
+    console.error('Error scheduling test inactivity notification:', error);
+    throw error;
+  }
+}
+
+/**
+ * Test function: Schedule course completion notification with 5-second delay
+ */
+export async function testCourseCompletionNotification(): Promise<void> {
+  try {
+    const { status } = await Notifications.getPermissionsAsync();
+    if (status !== 'granted') {
+      console.log('Notification permissions not granted');
+      return;
+    }
+
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "Félicitations ! 🎉",
+        body: "Vous avez terminé le cours de Mathématiques Avancées. Excellent travail !",
+        sound: true,
+        priority: Notifications.AndroidNotificationPriority.HIGH,
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+        seconds: 5, // 5 seconds for testing
+        repeats: false,
+      },
+    });
+
+    console.log('Test course completion notification scheduled for 5 seconds');
+  } catch (error) {
+    console.error('Error scheduling test course completion notification:', error);
+    throw error;
+  }
+}
+
+/**
+ * Test function: Schedule lesson continuation notification with 5-second delay
+ */
+export async function testLessonContinuationNotification(): Promise<void> {
+  try {
+    const { status } = await Notifications.getPermissionsAsync();
+    if (status !== 'granted') {
+      console.log('Notification permissions not granted');
+      return;
+    }
+
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "N'oubliez pas votre leçon ! 📚",
+        body: "N'oubliez pas de finir votre leçon de Introduction à l'algèbre. Vous y étiez presque !",
+        sound: true,
+        priority: Notifications.AndroidNotificationPriority.HIGH,
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+        seconds: 5, // 5 seconds for testing
+        repeats: false,
+      },
+    });
+
+    console.log('Test lesson continuation notification scheduled for 5 seconds');
+  } catch (error) {
+    console.error('Error scheduling test lesson continuation notification:', error);
+    throw error;
+  }
+}

@@ -11,6 +11,11 @@ import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
+import {
+  testInactivityNotification,
+  testCourseCompletionNotification,
+  testLessonContinuationNotification,
+} from "@/utils/notificationService";
 
 interface UserProfile {
   studentName: string;
@@ -65,6 +70,46 @@ export default function Profile() {
         },
       ]
     );
+  };
+
+  // Developer Tools: Test notification functions
+  const handleTestInactivity = async () => {
+    try {
+      await testInactivityNotification();
+      Alert.alert(
+        "Notification programmée ✅",
+        "La notification d'inactivité apparaîtra dans 5 secondes. Mettez l'app en arrière-plan pour la voir.",
+        [{ text: "OK" }]
+      );
+    } catch {
+      Alert.alert("Erreur", "Impossible de programmer la notification");
+    }
+  };
+
+  const handleTestCourseCompletion = async () => {
+    try {
+      await testCourseCompletionNotification();
+      Alert.alert(
+        "Notification programmée ✅",
+        "La notification de fin de cours apparaîtra dans 5 secondes. Mettez l'app en arrière-plan pour la voir.",
+        [{ text: "OK" }]
+      );
+    } catch {
+      Alert.alert("Erreur", "Impossible de programmer la notification");
+    }
+  };
+
+  const handleTestLessonContinuation = async () => {
+    try {
+      await testLessonContinuationNotification();
+      Alert.alert(
+        "Notification programmée ✅",
+        "La notification de continuation apparaîtra dans 5 secondes. Mettez l'app en arrière-plan pour la voir.",
+        [{ text: "OK" }]
+      );
+    } catch {
+      Alert.alert("Erreur", "Impossible de programmer la notification");
+    }
   };
 
   if (!userProfile) {
@@ -179,6 +224,70 @@ export default function Profile() {
                 <Text style={styles.statValue}>4</Text>
                 <Text style={styles.statLabel}>Livres lus</Text>
               </View>
+            </View>
+          </View>
+
+          {/* Developer Tools Section */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Outils de développement</Text>
+            <Text style={styles.devToolsDescription}>
+              Testez les notifications en direct (délai de 5 secondes)
+            </Text>
+
+            <View style={styles.devToolsContainer}>
+              {/* Test Inactivity Notification */}
+              <TouchableOpacity
+                style={styles.devToolButton}
+                onPress={handleTestInactivity}
+                activeOpacity={0.8}
+              >
+                <View style={styles.devToolIconContainer}>
+                  <Ionicons name="time-outline" size={24} color="#1E3A5F" />
+                </View>
+                <View style={styles.devToolTextContainer}>
+                  <Text style={styles.devToolTitle}>Tester la notification d&apos;inactivité</Text>
+                  <Text style={styles.devToolSubtitle}>
+                    &ldquo;On dirait que vous nous avez manqué !&rdquo;
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="#A0A0A0" />
+              </TouchableOpacity>
+
+              {/* Test Course Completion Notification */}
+              <TouchableOpacity
+                style={styles.devToolButton}
+                onPress={handleTestCourseCompletion}
+                activeOpacity={0.8}
+              >
+                <View style={[styles.devToolIconContainer, styles.devToolIconSuccess]}>
+                  <Ionicons name="trophy-outline" size={24} color="#28A745" />
+                </View>
+                <View style={styles.devToolTextContainer}>
+                  <Text style={styles.devToolTitle}>Tester la notification de fin de cours</Text>
+                  <Text style={styles.devToolSubtitle}>
+                    &ldquo;Félicitations ! Vous avez terminé...&rdquo;
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="#A0A0A0" />
+              </TouchableOpacity>
+
+              {/* Test Lesson Continuation Notification */}
+              <TouchableOpacity
+                style={styles.devToolButton}
+                onPress={handleTestLessonContinuation}
+                activeOpacity={0.8}
+              >
+                <View style={[styles.devToolIconContainer, styles.devToolIconWarning]}>
+                  <Ionicons name="book-outline" size={24} color="#FF9800" />
+                </View>
+                <View style={styles.devToolTextContainer}>
+                  <Text style={styles.devToolTitle}>Tester la notification de continuation</Text>
+                  <Text style={styles.devToolSubtitle}>
+                    &ldquo;N&apos;oubliez pas de finir votre leçon...&rdquo;
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="#A0A0A0" />
+              </TouchableOpacity>
             </View>
           </View>
 
@@ -364,5 +473,58 @@ const styles = StyleSheet.create({
     color: "#A0A0A0",
     textAlign: "center",
     marginTop: 20,
+  },
+  // Developer Tools
+  devToolsDescription: {
+    fontSize: 13,
+    color: "#5A5A5A",
+    marginBottom: 16,
+    fontStyle: "italic",
+  },
+  devToolsContainer: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  devToolButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E0E0E0",
+  },
+  devToolIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: "#EBF0F5",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
+  },
+  devToolIconSuccess: {
+    backgroundColor: "#E8F5E9",
+  },
+  devToolIconWarning: {
+    backgroundColor: "#FFF3E0",
+  },
+  devToolTextContainer: {
+    flex: 1,
+  },
+  devToolTitle: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#2C2C2C",
+    marginBottom: 4,
+  },
+  devToolSubtitle: {
+    fontSize: 12,
+    color: "#5A5A5A",
+    fontStyle: "italic",
   },
 });
