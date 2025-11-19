@@ -75,7 +75,7 @@ export default function Login() {
           <View style={styles.illustrationContainer}>
             <View style={styles.illustrationPlaceholder}>
               <Image
-                source={require("@/assets/images/login-header.png")}
+                source={require("@/assets/images/login-header-new.jpg")}
                 style={styles.headerImage}
                 resizeMode="cover"
               />
