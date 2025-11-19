@@ -2,6 +2,8 @@ import { Stack, useRouter, useSegments } from "expo-router";
 import { useEffect, useCallback } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ConnectionSimulatorProvider } from "@/contexts/ConnectionSimulatorContext";
+import { initializeNotificationService, updateLastAppOpenTimestamp } from "@/utils/notificationService";
+import { AppState } from "react-native";
 
 export default function RootLayout() {
   const router = useRouter();
@@ -28,6 +30,23 @@ export default function RootLayout() {
   useEffect(() => {
     checkAuthStatus();
   }, [checkAuthStatus]);
+
+  // Initialize notification service on app launch
+  useEffect(() => {
+    initializeNotificationService();
+
+    // Listen for app state changes
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active') {
+        // App came to foreground
+        updateLastAppOpenTimestamp();
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
 
   return (
     <ConnectionSimulatorProvider>

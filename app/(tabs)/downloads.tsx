@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { SAMPLE_PDF_URL } from "@/constants/SampleData";
+import { sendCourseCompletionNotification } from "@/utils/notificationService";
 
 type FilterTab = "cours" | "bibliotheque";
 
@@ -150,8 +151,25 @@ export default function Downloads() {
   const [expandedCourses, setExpandedCourses] = useState<Set<string>>(new Set());
   const [downloadedCourses, setDownloadedCourses] = useState<DownloadedCourse[]>(MOCK_DOWNLOADED_COURSES);
   const [downloadedBooks, setDownloadedBooks] = useState<DownloadedBook[]>(MOCK_DOWNLOADED_BOOKS);
+  const [notifiedCourses, setNotifiedCourses] = useState<Set<string>>(new Set());
 
   const totalDownloads = downloadedCourses.length + downloadedBooks.length;
+
+  // Monitor course completion and send notifications
+  useEffect(() => {
+    downloadedCourses.forEach((course) => {
+      const completedLessons = course.lessons.filter((l) => l.isCompleted).length;
+      const totalLessons = course.lessons.length;
+
+      // Check if course is 100% complete and notification not yet sent
+      if (totalLessons > 0 && completedLessons === totalLessons && !notifiedCourses.has(course.id)) {
+        // Send completion notification
+        sendCourseCompletionNotification(course.title);
+        // Mark as notified
+        setNotifiedCourses((prev) => new Set(prev).add(course.id));
+      }
+    });
+  }, [downloadedCourses, notifiedCourses]);
 
   const toggleCourse = (courseId: string) => {
     const newExpanded = new Set(expandedCourses);
@@ -314,40 +332,88 @@ export default function Downloads() {
     }
   };
 
-  const renderLesson = (lesson: Lesson) => (
-    <TouchableOpacity
-      key={lesson.id}
-      style={styles.lessonItem}
-      activeOpacity={0.7}
-      onPress={() => handleLessonPress(lesson)}
-    >
-      <View style={styles.lessonIcon}>
-        <Ionicons
-          name={lesson.isCompleted ? "checkmark-circle" : getMediaIcon(lesson.type)}
-          size={24}
-          color={lesson.isCompleted ? "#17A2B8" : "#FFD700"}
-        />
-      </View>
-      <View style={styles.lessonInfo}>
-        <Text
-          style={[
-            styles.lessonTitle,
-            lesson.isCompleted && styles.lessonTitleCompleted,
-          ]}
-        >
-          {lesson.title}
-        </Text>
-        <View style={styles.lessonMeta}>
-          <Text style={styles.lessonDuration}>{lesson.duration}</Text>
-          <View style={styles.lessonTypeBadge}>
-            <Text style={styles.lessonTypeText}>
-              {lesson.type === 'video' ? '🎥 Vidéo' : lesson.type === 'audio' ? '🎵 Audio' : '📄 PDF'}
-            </Text>
+  const handleDeleteLesson = (courseId: string, lessonId: string, lessonTitle: string) => {
+    Alert.alert(
+      "Supprimer la leçon",
+      "Voulez-vous vraiment supprimer cette leçon ? Le fichier sera effacé de votre appareil.",
+      [
+        {
+          text: "Annuler",
+          style: "cancel",
+        },
+        {
+          text: "Supprimer",
+          style: "destructive",
+          onPress: () => {
+            // Remove lesson from the course
+            setDownloadedCourses((prevCourses) =>
+              prevCourses.map((course) => {
+                if (course.id === courseId) {
+                  // Filter out the deleted lesson
+                  const updatedLessons = course.lessons.filter((l) => l.id !== lessonId);
+
+                  // If no lessons remain, we could optionally remove the entire course
+                  // For now, we'll keep the course with 0 lessons
+                  return {
+                    ...course,
+                    lessons: updatedLessons,
+                  };
+                }
+                return course;
+              }).filter((course) => course.lessons.length > 0) // Remove courses with no lessons
+            );
+
+            console.log(`Lesson deleted: ${lessonTitle} from course ${courseId}`);
+          },
+        },
+      ]
+    );
+  };
+
+  const renderLesson = (lesson: Lesson, courseId: string) => (
+    <View key={lesson.id} style={styles.lessonItemContainer}>
+      <TouchableOpacity
+        style={styles.lessonItem}
+        activeOpacity={0.7}
+        onPress={() => handleLessonPress(lesson)}
+      >
+        <View style={styles.lessonIcon}>
+          <Ionicons
+            name={lesson.isCompleted ? "checkmark-circle" : getMediaIcon(lesson.type)}
+            size={24}
+            color={lesson.isCompleted ? "#17A2B8" : "#FFD700"}
+          />
+        </View>
+        <View style={styles.lessonInfo}>
+          <Text
+            style={[
+              styles.lessonTitle,
+              lesson.isCompleted && styles.lessonTitleCompleted,
+            ]}
+          >
+            {lesson.title}
+          </Text>
+          <View style={styles.lessonMeta}>
+            <Text style={styles.lessonDuration}>{lesson.duration}</Text>
+            <View style={styles.lessonTypeBadge}>
+              <Text style={styles.lessonTypeText}>
+                {lesson.type === 'video' ? '🎥 Vidéo' : lesson.type === 'audio' ? '🎵 Audio' : '📄 PDF'}
+              </Text>
+            </View>
           </View>
         </View>
-      </View>
-      <Ionicons name="chevron-forward" size={20} color="#A0A0A0" />
-    </TouchableOpacity>
+        <Ionicons name="chevron-forward" size={20} color="#A0A0A0" />
+      </TouchableOpacity>
+
+      {/* Individual Lesson Delete Button */}
+      <TouchableOpacity
+        style={styles.lessonDeleteButton}
+        onPress={() => handleDeleteLesson(courseId, lesson.id, lesson.title)}
+        activeOpacity={0.7}
+      >
+        <Ionicons name="trash-outline" size={18} color="#DC3545" />
+      </TouchableOpacity>
+    </View>
   );
 
   const renderCourse = (course: DownloadedCourse) => {
@@ -402,7 +468,7 @@ export default function Downloads() {
         {/* Expanded Lessons */}
         {isExpanded && (
           <View style={styles.lessonsContainer}>
-            {course.lessons.map(renderLesson)}
+            {course.lessons.map((lesson) => renderLesson(lesson, course.id))}
           </View>
         )}
       </View>
@@ -795,14 +861,29 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingBottom: 8,
   },
+  lessonItemContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: 8,
+    marginVertical: 2,
+    paddingRight: 8,
+  },
   lessonItem: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 8,
-    marginHorizontal: 8,
-    marginVertical: 2,
+  },
+  lessonDeleteButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#FFEBEE",
+    justifyContent: "center",
+    alignItems: "center",
+    marginLeft: 8,
   },
   lessonIcon: {
     marginRight: 12,

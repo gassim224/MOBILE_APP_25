@@ -15,6 +15,7 @@ import { Audio, AVPlaybackStatus } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
 import { progressStorage, MediaProgress } from '@/utils/progressStorage';
+import { scheduleLessonContinuationReminder, cancelLessonContinuationReminder } from '@/utils/notificationService';
 
 export default function AudioPlayer() {
   const router = useRouter();
@@ -144,9 +145,12 @@ export default function AudioPlayer() {
       saveProgress();
     }
 
-    // Audio ended
+    // Audio ended - cancel continuation reminder since lesson is complete
     if (status.didJustFinish) {
       saveProgress();
+      if (lessonId) {
+        cancelLessonContinuationReminder(lessonId);
+      }
     }
   };
 
@@ -179,6 +183,12 @@ export default function AudioPlayer() {
 
   const handleClose = async () => {
     await saveProgress();
+
+    // If audio was not completed (progress < 95%), schedule continuation reminder
+    if (lessonId && lessonTitle && duration > 0 && position < duration * 0.95) {
+      await scheduleLessonContinuationReminder(lessonId, lessonTitle);
+    }
+
     router.back();
   };
 

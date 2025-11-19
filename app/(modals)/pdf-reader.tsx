@@ -14,6 +14,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { progressStorage, MediaProgress } from '@/utils/progressStorage';
 import { SAMPLE_PDF_URL } from '@/constants/SampleData';
+import { scheduleLessonContinuationReminder, cancelLessonContinuationReminder } from '@/utils/notificationService';
 
 // Conditionally import react-native-pdf only for native platforms
 let Pdf: any = null;
@@ -102,6 +103,11 @@ export default function PdfReader() {
     setCurrentPage(page);
     setTotalPages(numberOfPages);
     saveProgress(page);
+
+    // If user reached the last page, cancel continuation reminder
+    if (page === numberOfPages && itemId) {
+      cancelLessonContinuationReminder(itemId);
+    }
   };
 
   const handleLoadComplete = (numberOfPages: number) => {
@@ -126,6 +132,11 @@ export default function PdfReader() {
   const handleClose = async () => {
     if (Platform.OS !== 'web') {
       await saveProgress(currentPage);
+
+      // If PDF was not completed (current page < 90% of total pages), schedule continuation reminder
+      if (itemId && itemTitle && totalPages > 0 && currentPage < totalPages * 0.9) {
+        await scheduleLessonContinuationReminder(itemId, itemTitle);
+      }
     }
     router.back();
   };
