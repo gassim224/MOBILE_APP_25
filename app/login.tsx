@@ -17,7 +17,7 @@ import { StatusBar } from "expo-status-bar";
 
 export default function Login() {
   const router = useRouter();
-  const [studentId, setStudentId] = useState("student");
+  const [studentId, setStudentId] = useState("eleve1");
   const [password, setPassword] = useState("1234");
   const [loading, setLoading] = useState(false);
 
@@ -30,20 +30,29 @@ export default function Login() {
     setLoading(true);
 
     try {
-      // Mock authentication - assume any non-empty input is valid
       // Simulate API delay
       await new Promise((resolve) => setTimeout(resolve, 800));
+
+      // Test credentials validation
+      const isTestUser = studentId.trim() === "eleve1" && password.trim() === "1234";
 
       // Mock session token
       const sessionToken = `mock_token_${Date.now()}`;
 
-      // Mock user profile data
-      const userProfile = {
-        studentName: "Amara",
-        schoolName: "Le Grand Lycée",
-        grade: "10",
-        studentId: studentId,
-      };
+      // Mock user profile data - use specific data for test user
+      const userProfile = isTestUser
+        ? {
+            studentName: "Élève Test",
+            schoolName: "École Démonstration",
+            grade: "10",
+            studentId: studentId,
+          }
+        : {
+            studentName: "Amara",
+            schoolName: "Le Grand Lycée",
+            grade: "10",
+            studentId: studentId,
+          };
 
       // Store session token and user profile
       await AsyncStorage.setItem("sessionToken", sessionToken);
