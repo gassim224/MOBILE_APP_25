@@ -17,8 +17,8 @@ import { StatusBar } from "expo-status-bar";
 
 export default function Login() {
   const router = useRouter();
-  const [studentId, setStudentId] = useState("");
-  const [password, setPassword] = useState("");
+  const [studentId, setStudentId] = useState("student");
+  const [password, setPassword] = useState("1234");
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
