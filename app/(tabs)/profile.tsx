@@ -15,6 +15,9 @@ import {
   testInactivityNotification,
   testCourseCompletionNotification,
   testLessonContinuationNotification,
+  testNewContentNotification,
+  testNextSessionNotification,
+  testLowStorageNotification,
 } from "@/utils/notificationService";
 
 interface UserProfile {
@@ -105,6 +108,45 @@ export default function Profile() {
       Alert.alert(
         "Notification programmée ✅",
         "La notification de continuation apparaîtra dans 5 secondes. Mettez l'app en arrière-plan pour la voir.",
+        [{ text: "OK" }]
+      );
+    } catch {
+      Alert.alert("Erreur", "Impossible de programmer la notification");
+    }
+  };
+
+  const handleTestNewContent = async () => {
+    try {
+      await testNewContentNotification();
+      Alert.alert(
+        "Notification programmée ✅",
+        "La notification de nouveau contenu apparaîtra dans 5 secondes. Mettez l'app en arrière-plan pour la voir.",
+        [{ text: "OK" }]
+      );
+    } catch {
+      Alert.alert("Erreur", "Impossible de programmer la notification");
+    }
+  };
+
+  const handleTestNextSession = async () => {
+    try {
+      await testNextSessionNotification();
+      Alert.alert(
+        "Notification programmée ✅",
+        "La notification de prochaine séance apparaîtra dans 5 secondes. Mettez l'app en arrière-plan pour la voir.",
+        [{ text: "OK" }]
+      );
+    } catch {
+      Alert.alert("Erreur", "Impossible de programmer la notification");
+    }
+  };
+
+  const handleTestLowStorage = async () => {
+    try {
+      await testLowStorageNotification();
+      Alert.alert(
+        "Notification programmée ✅",
+        "La notification d'espace faible apparaîtra dans 5 secondes. Mettez l'app en arrière-plan pour la voir.",
         [{ text: "OK" }]
       );
     } catch {
@@ -284,6 +326,60 @@ export default function Profile() {
                   <Text style={styles.devToolTitle}>Tester la notification de continuation</Text>
                   <Text style={styles.devToolSubtitle}>
                     &ldquo;N&apos;oubliez pas de finir votre leçon...&rdquo;
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="#A0A0A0" />
+              </TouchableOpacity>
+
+              {/* Test New Content Notification */}
+              <TouchableOpacity
+                style={styles.devToolButton}
+                onPress={handleTestNewContent}
+                activeOpacity={0.8}
+              >
+                <View style={[styles.devToolIconContainer, styles.devToolIconInfo]}>
+                  <Ionicons name="download-outline" size={24} color="#17A2B8" />
+                </View>
+                <View style={styles.devToolTextContainer}>
+                  <Text style={styles.devToolTitle}>Tester notif. nouveau contenu</Text>
+                  <Text style={styles.devToolSubtitle}>
+                    &ldquo;De nouvelles leçons et livres sont disponibles...&rdquo;
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="#A0A0A0" />
+              </TouchableOpacity>
+
+              {/* Test Next Session Notification */}
+              <TouchableOpacity
+                style={styles.devToolButton}
+                onPress={handleTestNextSession}
+                activeOpacity={0.8}
+              >
+                <View style={[styles.devToolIconContainer, styles.devToolIconPurple]}>
+                  <Ionicons name="calendar-outline" size={24} color="#6F42C1" />
+                </View>
+                <View style={styles.devToolTextContainer}>
+                  <Text style={styles.devToolTitle}>Tester notif. prochaine séance</Text>
+                  <Text style={styles.devToolSubtitle}>
+                    &ldquo;Ta prochaine révision n&apos;est pas encore enregistrée...&rdquo;
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="#A0A0A0" />
+              </TouchableOpacity>
+
+              {/* Test Low Storage Notification */}
+              <TouchableOpacity
+                style={styles.devToolButton}
+                onPress={handleTestLowStorage}
+                activeOpacity={0.8}
+              >
+                <View style={[styles.devToolIconContainer, styles.devToolIconDanger]}>
+                  <Ionicons name="warning-outline" size={24} color="#DC3545" />
+                </View>
+                <View style={styles.devToolTextContainer}>
+                  <Text style={styles.devToolTitle}>Tester notif. espace faible</Text>
+                  <Text style={styles.devToolSubtitle}>
+                    &ldquo;Tu n&apos;as presque plus d&apos;espace...&rdquo;
                   </Text>
                 </View>
                 <Ionicons name="chevron-forward" size={20} color="#A0A0A0" />
@@ -512,6 +608,15 @@ const styles = StyleSheet.create({
   },
   devToolIconWarning: {
     backgroundColor: "#FFF3E0",
+  },
+  devToolIconInfo: {
+    backgroundColor: "#E3F2FD",
+  },
+  devToolIconPurple: {
+    backgroundColor: "#F3E5F5",
+  },
+  devToolIconDanger: {
+    backgroundColor: "#FFEBEE",
   },
   devToolTextContainer: {
     flex: 1,

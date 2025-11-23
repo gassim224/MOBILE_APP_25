@@ -362,3 +362,99 @@ export async function testLessonContinuationNotification(): Promise<void> {
     throw error;
   }
 }
+
+/**
+ * Test function: Schedule new content notification with 5-second delay
+ */
+export async function testNewContentNotification(): Promise<void> {
+  try {
+    const { status } = await Notifications.getPermissionsAsync();
+    if (status !== 'granted') {
+      console.log('Notification permissions not granted');
+      return;
+    }
+
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "Nouveau contenu disponible",
+        body: "De nouvelles leçons et livres sont disponibles. Télécharge-les maintenant pendant que tu es en ligne.",
+        sound: true,
+        priority: Notifications.AndroidNotificationPriority.HIGH,
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+        seconds: TIME_INTERVALS.TEST_NOTIFICATION_DELAY,
+        repeats: false,
+      },
+    });
+
+    console.log('Test new content notification scheduled for 5 seconds');
+  } catch (error) {
+    console.error('Error scheduling test new content notification:', error);
+    throw error;
+  }
+}
+
+/**
+ * Test function: Schedule next session notification with 5-second delay
+ */
+export async function testNextSessionNotification(): Promise<void> {
+  try {
+    const { status } = await Notifications.getPermissionsAsync();
+    if (status !== 'granted') {
+      console.log('Notification permissions not granted');
+      return;
+    }
+
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "Prépare ta prochaine séance",
+        body: "Ta prochaine révision ou lecture n'est pas encore enregistrée hors-ligne. Télécharge en un clic.",
+        sound: true,
+        priority: Notifications.AndroidNotificationPriority.HIGH,
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+        seconds: TIME_INTERVALS.TEST_NOTIFICATION_DELAY,
+        repeats: false,
+      },
+    });
+
+    console.log('Test next session notification scheduled for 5 seconds');
+  } catch (error) {
+    console.error('Error scheduling test next session notification:', error);
+    throw error;
+  }
+}
+
+/**
+ * Test function: Schedule low storage notification with 5-second delay
+ */
+export async function testLowStorageNotification(): Promise<void> {
+  try {
+    const { status } = await Notifications.getPermissionsAsync();
+    if (status !== 'granted') {
+      console.log('Notification permissions not granted');
+      return;
+    }
+
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "Espace de stockage faible",
+        body: "Tu n'as presque plus d'espace. Supprime les leçons ou livres terminés pour continuer à télécharger.",
+        sound: true,
+        priority: Notifications.AndroidNotificationPriority.HIGH,
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+        seconds: TIME_INTERVALS.TEST_NOTIFICATION_DELAY,
+        repeats: false,
+      },
+    });
+
+    console.log('Test low storage notification scheduled for 5 seconds');
+  } catch (error) {
+    console.error('Error scheduling test low storage notification:', error);
+    throw error;
+  }
+}
