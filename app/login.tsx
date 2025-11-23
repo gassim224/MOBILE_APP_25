@@ -37,6 +37,7 @@ export default function Login() {
     }
 
     setLoading(true);
+    setIsNavigating(true);
 
     try {
       // Simulate API delay
@@ -77,15 +78,13 @@ export default function Login() {
           [{ text: MESSAGES.OK }]
         );
         setLoading(false);
+        setIsNavigating(false);
         return;
       }
 
-      // Navigate to tabs with smooth transition and race condition prevention
-      setIsNavigating(true);
+      // Navigate to tabs with smooth transition
       setTimeout(() => {
-        if (isNavigating) {
-          router.replace("/(tabs)");
-        }
+        router.replace("/(tabs)");
       }, TIME_INTERVALS.LOGIN_TRANSITION_DELAY);
     } catch (error) {
       console.error("Login error:", error);
@@ -94,6 +93,7 @@ export default function Login() {
         MESSAGES.LOGIN_ERROR_GENERIC,
         [{ text: MESSAGES.OK }]
       );
+      setIsNavigating(false);
     } finally {
       setLoading(false);
     }
@@ -157,14 +157,14 @@ export default function Login() {
             <TouchableOpacity
               style={[
                 styles.loginButton,
-                (!studentId.trim() || !password.trim() || loading) &&
+                (!studentId.trim() || !password.trim() || loading || isNavigating) &&
                   styles.loginButtonDisabled,
               ]}
               onPress={handleLogin}
-              disabled={!studentId.trim() || !password.trim() || loading}
+              disabled={!studentId.trim() || !password.trim() || loading || isNavigating}
               activeOpacity={0.8}
             >
-              {loading ? (
+              {loading || isNavigating ? (
                 <ActivityIndicator color="#FFFFFF" />
               ) : (
                 <Text style={styles.loginButtonText}>Se connecter</Text>
