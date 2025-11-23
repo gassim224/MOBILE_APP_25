@@ -2,6 +2,7 @@ import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import { STORAGE_KEYS, TIME_INTERVALS } from '@/constants/AppConstants';
+import logger from '@/utils/Logger';
 
 // Storage keys
 const NOTIFICATION_PERMISSION_KEY = STORAGE_KEYS.NOTIFICATION_PERMISSION;
@@ -33,7 +34,7 @@ export async function requestNotificationPermissions(): Promise<boolean> {
     }
 
     if (finalStatus !== 'granted') {
-      console.log('Notification permissions denied');
+      logger.info('Notification permissions denied');
       return false;
     }
 
@@ -49,7 +50,7 @@ export async function requestNotificationPermissions(): Promise<boolean> {
 
     return true;
   } catch (error) {
-    console.error('Error requesting notification permissions:', error);
+    logger.error('Error requesting notification permissions:', error);
     return false;
   }
 }
@@ -69,13 +70,13 @@ export async function checkAndRequestNotificationPermissionsOnFirstLaunch(): Pro
       await AsyncStorage.setItem(NOTIFICATION_PERMISSION_KEY, 'true');
 
       if (granted) {
-        console.log('Notification permissions granted on first launch');
+        logger.info('Notification permissions granted on first launch');
         // Schedule inactivity reminder for 48 hours from now
         await scheduleInactivityReminder();
       }
     }
   } catch (error) {
-    console.error('Error checking notification permissions on first launch:', error);
+    logger.error('Error checking notification permissions on first launch:', error);
   }
 }
 
@@ -92,7 +93,7 @@ export async function updateLastAppOpenTimestamp(): Promise<void> {
     await cancelInactivityReminder();
     await scheduleInactivityReminder();
   } catch (error) {
-    console.error('Error updating last app open timestamp:', error);
+    logger.error('Error updating last app open timestamp:', error);
   }
 }
 
@@ -128,9 +129,9 @@ async function scheduleInactivityReminder(): Promise<void> {
     // Save notification ID for later cancellation
     await AsyncStorage.setItem(INACTIVITY_NOTIFICATION_ID_KEY, notificationId);
 
-    console.log('Inactivity reminder scheduled:', notificationId);
+    logger.info('Inactivity reminder scheduled:', notificationId);
   } catch (error) {
-    console.error('Error scheduling inactivity reminder:', error);
+    logger.error('Error scheduling inactivity reminder:', error);
   }
 }
 
@@ -144,10 +145,10 @@ async function cancelInactivityReminder(): Promise<void> {
     if (notificationId) {
       await Notifications.cancelScheduledNotificationAsync(notificationId);
       await AsyncStorage.removeItem(INACTIVITY_NOTIFICATION_ID_KEY);
-      console.log('Inactivity reminder cancelled:', notificationId);
+      logger.info('Inactivity reminder cancelled:', notificationId);
     }
   } catch (error) {
-    console.error('Error cancelling inactivity reminder:', error);
+    logger.error('Error cancelling inactivity reminder:', error);
   }
 }
 
@@ -171,9 +172,9 @@ export async function sendCourseCompletionNotification(courseName: string): Prom
       trigger: null, // Send immediately
     });
 
-    console.log('Course completion notification sent for:', courseName);
+    logger.info('Course completion notification sent for:', courseName);
   } catch (error) {
-    console.error('Error sending course completion notification:', error);
+    logger.error('Error sending course completion notification:', error);
   }
 }
 
@@ -212,9 +213,9 @@ export async function scheduleLessonContinuationReminder(
     // Save notification ID for this lesson
     await AsyncStorage.setItem(`${STORAGE_KEYS.LESSON_REMINDER_PREFIX}${lessonId}`, notificationId);
 
-    console.log('Lesson continuation reminder scheduled:', lessonId, notificationId);
+    logger.info('Lesson continuation reminder scheduled:', lessonId, notificationId);
   } catch (error) {
-    console.error('Error scheduling lesson continuation reminder:', error);
+    logger.error('Error scheduling lesson continuation reminder:', error);
   }
 }
 
@@ -228,10 +229,10 @@ export async function cancelLessonContinuationReminder(lessonId: string): Promis
     if (notificationId) {
       await Notifications.cancelScheduledNotificationAsync(notificationId);
       await AsyncStorage.removeItem(`${STORAGE_KEYS.LESSON_REMINDER_PREFIX}${lessonId}`);
-      console.log('Lesson continuation reminder cancelled:', lessonId);
+      logger.info('Lesson continuation reminder cancelled:', lessonId);
     }
   } catch (error) {
-    console.error('Error cancelling lesson continuation reminder:', error);
+    logger.error('Error cancelling lesson continuation reminder:', error);
   }
 }
 
@@ -247,7 +248,7 @@ export async function initializeNotificationService(): Promise<void> {
     // Update last app open timestamp
     await updateLastAppOpenTimestamp();
   } catch (error) {
-    console.error('Error initializing notification service:', error);
+    logger.error('Error initializing notification service:', error);
   }
 }
 
@@ -258,7 +259,7 @@ export async function getAllScheduledNotifications(): Promise<Notifications.Noti
   try {
     return await Notifications.getAllScheduledNotificationsAsync();
   } catch (error) {
-    console.error('Error getting scheduled notifications:', error);
+    logger.error('Error getting scheduled notifications:', error);
     return [];
   }
 }
@@ -274,7 +275,7 @@ export async function testInactivityNotification(): Promise<void> {
   try {
     const { status } = await Notifications.getPermissionsAsync();
     if (status !== 'granted') {
-      console.log('Notification permissions not granted');
+      logger.info('Notification permissions not granted');
       return;
     }
 
@@ -292,9 +293,9 @@ export async function testInactivityNotification(): Promise<void> {
       },
     });
 
-    console.log('Test inactivity notification scheduled for 5 seconds');
+    logger.info('Test inactivity notification scheduled for 5 seconds');
   } catch (error) {
-    console.error('Error scheduling test inactivity notification:', error);
+    logger.error('Error scheduling test inactivity notification:', error);
     throw error;
   }
 }
@@ -306,7 +307,7 @@ export async function testCourseCompletionNotification(): Promise<void> {
   try {
     const { status } = await Notifications.getPermissionsAsync();
     if (status !== 'granted') {
-      console.log('Notification permissions not granted');
+      logger.info('Notification permissions not granted');
       return;
     }
 
@@ -324,9 +325,9 @@ export async function testCourseCompletionNotification(): Promise<void> {
       },
     });
 
-    console.log('Test course completion notification scheduled for 5 seconds');
+    logger.info('Test course completion notification scheduled for 5 seconds');
   } catch (error) {
-    console.error('Error scheduling test course completion notification:', error);
+    logger.error('Error scheduling test course completion notification:', error);
     throw error;
   }
 }
@@ -338,7 +339,7 @@ export async function testLessonContinuationNotification(): Promise<void> {
   try {
     const { status } = await Notifications.getPermissionsAsync();
     if (status !== 'granted') {
-      console.log('Notification permissions not granted');
+      logger.info('Notification permissions not granted');
       return;
     }
 
@@ -356,9 +357,9 @@ export async function testLessonContinuationNotification(): Promise<void> {
       },
     });
 
-    console.log('Test lesson continuation notification scheduled for 5 seconds');
+    logger.info('Test lesson continuation notification scheduled for 5 seconds');
   } catch (error) {
-    console.error('Error scheduling test lesson continuation notification:', error);
+    logger.error('Error scheduling test lesson continuation notification:', error);
     throw error;
   }
 }
@@ -370,7 +371,7 @@ export async function testNewContentNotification(): Promise<void> {
   try {
     const { status } = await Notifications.getPermissionsAsync();
     if (status !== 'granted') {
-      console.log('Notification permissions not granted');
+      logger.info('Notification permissions not granted');
       return;
     }
 
@@ -388,9 +389,9 @@ export async function testNewContentNotification(): Promise<void> {
       },
     });
 
-    console.log('Test new content notification scheduled for 5 seconds');
+    logger.info('Test new content notification scheduled for 5 seconds');
   } catch (error) {
-    console.error('Error scheduling test new content notification:', error);
+    logger.error('Error scheduling test new content notification:', error);
     throw error;
   }
 }
@@ -402,7 +403,7 @@ export async function testNextSessionNotification(): Promise<void> {
   try {
     const { status } = await Notifications.getPermissionsAsync();
     if (status !== 'granted') {
-      console.log('Notification permissions not granted');
+      logger.info('Notification permissions not granted');
       return;
     }
 
@@ -420,9 +421,9 @@ export async function testNextSessionNotification(): Promise<void> {
       },
     });
 
-    console.log('Test next session notification scheduled for 5 seconds');
+    logger.info('Test next session notification scheduled for 5 seconds');
   } catch (error) {
-    console.error('Error scheduling test next session notification:', error);
+    logger.error('Error scheduling test next session notification:', error);
     throw error;
   }
 }
@@ -434,7 +435,7 @@ export async function testLowStorageNotification(): Promise<void> {
   try {
     const { status } = await Notifications.getPermissionsAsync();
     if (status !== 'granted') {
-      console.log('Notification permissions not granted');
+      logger.info('Notification permissions not granted');
       return;
     }
 
@@ -452,9 +453,9 @@ export async function testLowStorageNotification(): Promise<void> {
       },
     });
 
-    console.log('Test low storage notification scheduled for 5 seconds');
+    logger.info('Test low storage notification scheduled for 5 seconds');
   } catch (error) {
-    console.error('Error scheduling test low storage notification:', error);
+    logger.error('Error scheduling test low storage notification:', error);
     throw error;
   }
 }

@@ -19,6 +19,7 @@ import {
   testNextSessionNotification,
   testLowStorageNotification,
 } from "@/utils/notificationService";
+import logger from "@/utils/Logger";
 
 interface UserProfile {
   studentName: string;
@@ -40,7 +41,7 @@ export default function Profile() {
         router.replace("/login");
       }
     } catch (error) {
-      console.error("Error loading user profile:", error);
+      logger.error("Error loading user profile:", error);
       router.replace("/login");
     }
   }, [router]);
@@ -67,7 +68,7 @@ export default function Profile() {
               await AsyncStorage.removeItem("userProfile");
               router.replace("/login");
             } catch (error) {
-              console.error("Logout error:", error);
+              logger.error("Logout error:", error);
             }
           },
         },

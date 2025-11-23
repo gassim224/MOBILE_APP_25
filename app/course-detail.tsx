@@ -13,6 +13,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useConnectionSimulator } from "@/contexts/ConnectionSimulatorContext";
 import { Lesson } from "@/types";
 import { MESSAGES, TIME_INTERVALS } from "@/constants/AppConstants";
+import logger from "@/utils/Logger";
 
 // Mock lessons data for a course
 const MOCK_LESSONS: Lesson[] = [
@@ -152,7 +153,7 @@ export default function CourseDetail() {
         setDownloadingLessonId(null);
       }, TIME_INTERVALS.DOWNLOAD_SIMULATION);
     } catch (error) {
-      console.error("Download error:", error);
+      logger.error("Download error:", error);
       setDownloadingLessonId(null);
       Alert.alert(
         "Erreur",
@@ -201,7 +202,7 @@ export default function CourseDetail() {
                 );
               }, TIME_INTERVALS.DOWNLOAD_ALL_SIMULATION);
             } catch (error) {
-              console.error("Download all error:", error);
+              logger.error("Download all error:", error);
               setDownloadingAll(false);
               Alert.alert(
                 "Erreur",

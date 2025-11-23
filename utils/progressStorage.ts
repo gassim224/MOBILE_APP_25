@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { MediaProgress } from '@/types';
 import { STORAGE_KEYS } from '@/constants/AppConstants';
+import logger from '@/utils/Logger';
 
 // Re-export MediaProgress for backward compatibility
 export type { MediaProgress } from '@/types';
@@ -16,7 +17,7 @@ export const progressStorage = {
       const key = `${PROGRESS_KEY_PREFIX}${progress.lessonId}`;
       await AsyncStorage.setItem(key, JSON.stringify(progress));
     } catch (error) {
-      console.error('Error saving progress:', error);
+      logger.error('Error saving progress:', error);
       throw error;
     }
   },
@@ -30,7 +31,7 @@ export const progressStorage = {
       const data = await AsyncStorage.getItem(key);
       return data ? JSON.parse(data) : null;
     } catch (error) {
-      console.error('Error getting progress:', error);
+      logger.error('Error getting progress:', error);
       return null;
     }
   },
@@ -43,7 +44,7 @@ export const progressStorage = {
       const key = `${PROGRESS_KEY_PREFIX}${lessonId}`;
       await AsyncStorage.removeItem(key);
     } catch (error) {
-      console.error('Error deleting progress:', error);
+      logger.error('Error deleting progress:', error);
       throw error;
     }
   },
@@ -60,7 +61,7 @@ export const progressStorage = {
         .map(([, value]) => (value ? JSON.parse(value) : null))
         .filter((item): item is MediaProgress => item !== null);
     } catch (error) {
-      console.error('Error getting all progress:', error);
+      logger.error('Error getting all progress:', error);
       return [];
     }
   },
@@ -74,7 +75,7 @@ export const progressStorage = {
       const progressKeys = keys.filter(key => key.startsWith(PROGRESS_KEY_PREFIX));
       await AsyncStorage.multiRemove(progressKeys);
     } catch (error) {
-      console.error('Error clearing all progress:', error);
+      logger.error('Error clearing all progress:', error);
       throw error;
     }
   },

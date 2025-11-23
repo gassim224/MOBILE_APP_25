@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { sendCourseCompletionNotification } from './notificationService';
 import { CourseProgress } from '@/types';
 import { STORAGE_KEYS } from '@/constants/AppConstants';
+import logger from '@/utils/Logger';
 
 const COURSE_PROGRESS_KEY = STORAGE_KEYS.COURSE_PROGRESS_PREFIX;
 
@@ -16,7 +17,7 @@ export async function getCourseProgress(courseId: string): Promise<CourseProgres
     }
     return null;
   } catch (error) {
-    console.error('Error getting course progress:', error);
+    logger.error('Error getting course progress:', error);
     return null;
   }
 }
@@ -43,7 +44,7 @@ export async function initializeCourseProgress(
       await AsyncStorage.setItem(`${COURSE_PROGRESS_KEY}${courseId}`, JSON.stringify(progress));
     }
   } catch (error) {
-    console.error('Error initializing course progress:', error);
+    logger.error('Error initializing course progress:', error);
   }
 }
 
@@ -93,7 +94,7 @@ export async function markLessonCompleted(
 
     return progress.completedLessons.length >= totalLessons;
   } catch (error) {
-    console.error('Error marking lesson completed:', error);
+    logger.error('Error marking lesson completed:', error);
     return false;
   }
 }
@@ -109,7 +110,7 @@ export async function isLessonCompleted(
     const progress = await getCourseProgress(courseId);
     return progress ? progress.completedLessons.includes(lessonId) : false;
   } catch (error) {
-    console.error('Error checking lesson completion:', error);
+    logger.error('Error checking lesson completion:', error);
     return false;
   }
 }
@@ -125,7 +126,7 @@ export async function getCourseCompletionPercentage(courseId: string): Promise<n
     }
     return Math.round((progress.completedLessons.length / progress.totalLessons) * 100);
   } catch (error) {
-    console.error('Error getting course completion percentage:', error);
+    logger.error('Error getting course completion percentage:', error);
     return 0;
   }
 }
@@ -137,6 +138,6 @@ export async function resetCourseProgress(courseId: string): Promise<void> {
   try {
     await AsyncStorage.removeItem(`${COURSE_PROGRESS_KEY}${courseId}`);
   } catch (error) {
-    console.error('Error resetting course progress:', error);
+    logger.error('Error resetting course progress:', error);
   }
 }

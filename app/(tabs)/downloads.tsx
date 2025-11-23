@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, memo } from "react";
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { SAMPLE_PDF_URL } from "@/constants/SampleData";
 import { sendCourseCompletionNotification } from "@/utils/notificationService";
+import logger from "@/utils/Logger";
 
 type FilterTab = "cours" | "bibliotheque";
 
@@ -158,9 +159,20 @@ export default function Downloads() {
 
   // Handle incoming tab parameter from navigation
   useEffect(() => {
-    const tabParam = params.tab as string | undefined;
-    if (tabParam === "cours" || tabParam === "bibliotheque") {
-      setActiveTab(tabParam);
+    // Strict typing: handle both string and array cases
+    const tabParam = params.tab;
+    let normalizedTab: string | undefined;
+
+    // If it's an array, take the first element; otherwise use it directly
+    if (Array.isArray(tabParam)) {
+      normalizedTab = tabParam[0];
+    } else {
+      normalizedTab = tabParam as string | undefined;
+    }
+
+    // Validate the tab value before setting it
+    if (normalizedTab === "cours" || normalizedTab === "bibliotheque") {
+      setActiveTab(normalizedTab);
     }
   }, [params.tab]);
 
@@ -372,57 +384,65 @@ export default function Downloads() {
               }).filter((course) => course.lessons.length > 0) // Remove courses with no lessons
             );
 
-            console.log(`Lesson deleted: ${lessonTitle} from course ${courseId}`);
+            logger.info(`Lesson deleted: ${lessonTitle} from course ${courseId}`);
           },
         },
       ]
     );
   };
 
-  const renderLesson = (lesson: Lesson, courseId: string) => (
-    <View key={lesson.id} style={styles.lessonItemContainer}>
-      <TouchableOpacity
-        style={styles.lessonItem}
-        activeOpacity={0.7}
-        onPress={() => handleLessonPress(lesson)}
-      >
-        <View style={styles.lessonIcon}>
-          <Ionicons
-            name={lesson.isCompleted ? "checkmark-circle" : getMediaIcon(lesson.type)}
-            size={24}
-            color={lesson.isCompleted ? "#17A2B8" : "#FFD700"}
-          />
-        </View>
-        <View style={styles.lessonInfo}>
-          <Text
-            style={[
-              styles.lessonTitle,
-              lesson.isCompleted && styles.lessonTitleCompleted,
-            ]}
-          >
-            {lesson.title}
-          </Text>
-          <View style={styles.lessonMeta}>
-            <Text style={styles.lessonDuration}>{lesson.duration}</Text>
-            <View style={styles.lessonTypeBadge}>
-              <Text style={styles.lessonTypeText}>
-                {lesson.type === 'video' ? '🎥 Vidéo' : lesson.type === 'audio' ? '🎵 Audio' : '📄 PDF'}
-              </Text>
+  // Memoized lesson item component for better performance
+  const LessonItem = memo(({ lesson, courseId }: { lesson: Lesson; courseId: string }) => {
+    return (
+      <View style={styles.lessonItemContainer}>
+        <TouchableOpacity
+          style={styles.lessonItem}
+          activeOpacity={0.7}
+          onPress={() => handleLessonPress(lesson)}
+        >
+          <View style={styles.lessonIcon}>
+            <Ionicons
+              name={lesson.isCompleted ? "checkmark-circle" : getMediaIcon(lesson.type)}
+              size={24}
+              color={lesson.isCompleted ? "#17A2B8" : "#FFD700"}
+            />
+          </View>
+          <View style={styles.lessonInfo}>
+            <Text
+              style={[
+                styles.lessonTitle,
+                lesson.isCompleted && styles.lessonTitleCompleted,
+              ]}
+            >
+              {lesson.title}
+            </Text>
+            <View style={styles.lessonMeta}>
+              <Text style={styles.lessonDuration}>{lesson.duration}</Text>
+              <View style={styles.lessonTypeBadge}>
+                <Text style={styles.lessonTypeText}>
+                  {lesson.type === 'video' ? '🎥 Vidéo' : lesson.type === 'audio' ? '🎵 Audio' : '📄 PDF'}
+                </Text>
+              </View>
             </View>
           </View>
-        </View>
-        <Ionicons name="chevron-forward" size={20} color="#A0A0A0" />
-      </TouchableOpacity>
+          <Ionicons name="chevron-forward" size={20} color="#A0A0A0" />
+        </TouchableOpacity>
 
-      {/* Individual Lesson Delete Button */}
-      <TouchableOpacity
-        style={styles.lessonDeleteButton}
-        onPress={() => handleDeleteLesson(courseId, lesson.id, lesson.title)}
-        activeOpacity={0.7}
-      >
-        <Ionicons name="trash-outline" size={18} color="#DC3545" />
-      </TouchableOpacity>
-    </View>
+        {/* Individual Lesson Delete Button */}
+        <TouchableOpacity
+          style={styles.lessonDeleteButton}
+          onPress={() => handleDeleteLesson(courseId, lesson.id, lesson.title)}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="trash-outline" size={18} color="#DC3545" />
+        </TouchableOpacity>
+      </View>
+    );
+  });
+  LessonItem.displayName = 'LessonItem';
+
+  const renderLesson = (lesson: Lesson, courseId: string) => (
+    <LessonItem key={lesson.id} lesson={lesson} courseId={courseId} />
   );
 
   const renderCourse = (course: DownloadedCourse) => {
@@ -496,35 +516,43 @@ export default function Downloads() {
     });
   };
 
+  // Memoized book item component for better performance
+  const BookItem = memo(({ book }: { book: DownloadedBook }) => {
+    return (
+      <View style={styles.bookContainer}>
+        <View style={styles.bookCover}>
+          <Text style={styles.bookCoverEmoji}>{book.thumbnail}</Text>
+        </View>
+        <View style={styles.bookInfo}>
+          <Text style={styles.bookTitle}>{book.title}</Text>
+          <Text style={styles.bookAuthor}>{book.author}</Text>
+          <Text style={styles.bookDownloadedDate}>{book.downloadedAt}</Text>
+        </View>
+        <View style={styles.bookActions}>
+          <TouchableOpacity
+            style={styles.bookActionButton}
+            activeOpacity={0.7}
+            onPress={() => handleBookRead(book)}
+          >
+            <Ionicons name="book-outline" size={20} color="#1E3A5F" />
+            <Text style={styles.bookActionText}>Lire</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.bookActionButton, styles.deleteButton]}
+            onPress={() => handleDeleteBook(book.id, book.title)}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="trash-outline" size={20} color="#DC3545" />
+            <Text style={[styles.bookActionText, styles.deleteText]}>Supprimer</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  });
+  BookItem.displayName = 'BookItem';
+
   const renderBook = (book: DownloadedBook) => (
-    <View key={book.id} style={styles.bookContainer}>
-      <View style={styles.bookCover}>
-        <Text style={styles.bookCoverEmoji}>{book.thumbnail}</Text>
-      </View>
-      <View style={styles.bookInfo}>
-        <Text style={styles.bookTitle}>{book.title}</Text>
-        <Text style={styles.bookAuthor}>{book.author}</Text>
-        <Text style={styles.bookDownloadedDate}>{book.downloadedAt}</Text>
-      </View>
-      <View style={styles.bookActions}>
-        <TouchableOpacity
-          style={styles.bookActionButton}
-          activeOpacity={0.7}
-          onPress={() => handleBookRead(book)}
-        >
-          <Ionicons name="book-outline" size={20} color="#1E3A5F" />
-          <Text style={styles.bookActionText}>Lire</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.bookActionButton, styles.deleteButton]}
-          onPress={() => handleDeleteBook(book.id, book.title)}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="trash-outline" size={20} color="#DC3545" />
-          <Text style={[styles.bookActionText, styles.deleteText]}>Supprimer</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
+    <BookItem key={book.id} book={book} />
   );
 
   return (

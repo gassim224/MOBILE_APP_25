@@ -14,6 +14,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useConnectionSimulator } from "@/contexts/ConnectionSimulatorContext";
+import logger from "@/utils/Logger";
 
 interface UserProfile {
   studentName: string;
@@ -166,7 +167,7 @@ export default function Home() {
         router.replace("/login");
       }
     } catch (error) {
-      console.error("Error loading user profile:", error);
+      logger.error("Error loading user profile:", error);
       router.replace("/login");
     }
   }, [router]);
@@ -193,22 +194,34 @@ export default function Home() {
   };
 
   const handleRecentActivityPress = (activity: RecentActivity) => {
-    if (activity.type === "course") {
-      // Navigate to Downloads screen with Cours tab
-      router.push({
-        pathname: "/(tabs)/downloads",
-        params: {
-          tab: "cours",
-        },
-      });
-    } else {
-      // Navigate to Downloads screen with Bibliothèque tab
-      router.push({
-        pathname: "/(tabs)/downloads",
-        params: {
-          tab: "bibliotheque",
-        },
-      });
+    // Validate activity data before navigation
+    if (!activity || !activity.id || !activity.type) {
+      logger.warn("Invalid activity data:", activity);
+      return;
+    }
+
+    try {
+      if (activity.type === "course") {
+        // Navigate to Downloads screen with Cours tab
+        router.push({
+          pathname: "/(tabs)/downloads",
+          params: {
+            tab: "cours",
+          },
+        });
+      } else if (activity.type === "book") {
+        // Navigate to Downloads screen with Bibliothèque tab
+        router.push({
+          pathname: "/(tabs)/downloads",
+          params: {
+            tab: "bibliotheque",
+          },
+        });
+      } else {
+        logger.warn("Unknown activity type:", activity.type);
+      }
+    } catch (error) {
+      logger.error("Error navigating to recent activity:", error);
     }
   };
 
@@ -322,7 +335,7 @@ export default function Home() {
               activeOpacity={0.8}
               onPress={() => {
                 // Implement download logic
-                console.log("Download book:", selectedBook.title);
+                logger.info("Download book:", selectedBook.title);
                 setBookModalVisible(false);
               }}
             >

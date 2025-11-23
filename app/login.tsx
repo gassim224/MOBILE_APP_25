@@ -17,6 +17,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { StatusBar } from "expo-status-bar";
 import { TEST_CREDENTIALS, STORAGE_KEYS, TIME_INTERVALS, MESSAGES } from "@/constants/AppConstants";
 import { UserProfile } from "@/types";
+import logger from "@/utils/Logger";
 
 export default function Login() {
   const router = useRouter();
@@ -71,7 +72,7 @@ export default function Login() {
         await AsyncStorage.setItem(STORAGE_KEYS.SESSION_TOKEN, sessionToken);
         await AsyncStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(userProfile));
       } catch (storageError) {
-        console.error("AsyncStorage error:", storageError);
+        logger.error("AsyncStorage error:", storageError);
         Alert.alert(
           "Erreur",
           "Impossible de sauvegarder les informations de connexion. Veuillez réessayer.",
@@ -87,7 +88,7 @@ export default function Login() {
         router.replace("/(tabs)");
       }, TIME_INTERVALS.LOGIN_TRANSITION_DELAY);
     } catch (error) {
-      console.error("Login error:", error);
+      logger.error("Login error:", error);
       Alert.alert(
         "Erreur",
         MESSAGES.LOGIN_ERROR_GENERIC,

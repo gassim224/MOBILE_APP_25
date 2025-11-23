@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, Rea
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import NetInfo from "@react-native-community/netinfo";
 import { STORAGE_KEYS, KIOSK_SSID_KEYWORDS } from "@/constants/AppConstants";
+import logger from "@/utils/Logger";
 
 interface ConnectionSimulatorContextType {
   isConnectedToKiosk: boolean;
@@ -38,14 +39,14 @@ export function ConnectionSimulatorProvider({ children }: { children: ReactNode 
           setSimulatedConnectionStateInternal(stateValue === "true");
         }
       } catch (error) {
-        console.error("Error loading simulator settings:", error);
+        logger.error("Error loading simulator settings:", error);
       }
     };
 
     loadSimulatorSettings();
   }, []);
 
-  // Monitor real connection state
+  // Monitor real connection state with debouncing to prevent excessive calls
   const checkRealKioskConnection = useCallback(async () => {
     try {
       const netInfo = await NetInfo.fetch();
@@ -62,22 +63,40 @@ export function ConnectionSimulatorProvider({ children }: { children: ReactNode 
         setRealConnectionState(false);
       }
     } catch (error) {
-      console.error("Error checking real kiosk connection:", error);
+      logger.error("Error checking real kiosk connection:", error);
       setRealConnectionState(false);
     }
   }, []);
 
+  // Set up network listener only once
   useEffect(() => {
+    // Initial check
     checkRealKioskConnection();
 
-    const unsubscribe = NetInfo.addEventListener(() => {
-      checkRealKioskConnection();
+    // Set up listener with debouncing
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const unsubscribe = NetInfo.addEventListener((state) => {
+      // Clear existing timer
+      if (debounceTimer) {
+        clearTimeout(debounceTimer);
+      }
+
+      // Debounce network state changes to prevent excessive calls
+      debounceTimer = setTimeout(() => {
+        checkRealKioskConnection();
+      }, 300); // 300ms debounce
     });
 
     return () => {
       unsubscribe();
+      if (debounceTimer) {
+        clearTimeout(debounceTimer);
+      }
     };
-  }, [checkRealKioskConnection]);
+    // Empty dependency array - only run once on mount
+    // checkRealKioskConnection is stable due to useCallback with empty deps
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Toggle simulator on/off
   const toggleSimulator = async () => {
@@ -86,7 +105,7 @@ export function ConnectionSimulatorProvider({ children }: { children: ReactNode 
       setIsSimulatorEnabled(newState);
       await AsyncStorage.setItem(SIMULATOR_ENABLED_KEY, newState.toString());
     } catch (error) {
-      console.error("Error toggling simulator:", error);
+      logger.error("Error toggling simulator:", error);
     }
   };
 
@@ -96,7 +115,7 @@ export function ConnectionSimulatorProvider({ children }: { children: ReactNode 
       setSimulatedConnectionStateInternal(state);
       await AsyncStorage.setItem(SIMULATED_STATE_KEY, state.toString());
     } catch (error) {
-      console.error("Error setting simulated connection state:", error);
+      logger.error("Error setting simulated connection state:", error);
     }
   };
 
