@@ -14,34 +14,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { SAMPLE_PDF_URL } from "@/constants/SampleData";
 import { sendCourseCompletionNotification } from "@/utils/notificationService";
 import logger from "@/utils/Logger";
-
-type FilterTab = "cours" | "bibliotheque";
-
-interface DownloadedCourse {
-  id: string;
-  title: string;
-  thumbnail: string;
-  lessons: Lesson[];
-  downloadedAt: string;
-}
-
-interface Lesson {
-  id: string;
-  title: string;
-  duration: string;
-  isCompleted: boolean;
-  type: 'video' | 'audio' | 'pdf';
-  mediaUrl?: string;
-}
-
-interface DownloadedBook {
-  id: string;
-  title: string;
-  author: string;
-  thumbnail: string;
-  downloadedAt: string;
-  pdfUrl?: string;
-}
+import { getStorageStatus } from "@/utils/storageUtils";
+import { FilterTab, DownloadedCourse, Lesson, DownloadedBook } from "@/types";
 
 // Mock data - populate to test different states
 const MOCK_DOWNLOADED_COURSES: DownloadedCourse[] = [
@@ -55,7 +29,9 @@ const MOCK_DOWNLOADED_COURSES: DownloadedCourse[] = [
         id: "1-1",
         title: "Introduction à l'algèbre",
         duration: "15 min",
+        size: "45 MB",
         isCompleted: true,
+        isDownloaded: true,
         type: 'video',
         mediaUrl: 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
       },
@@ -63,7 +39,9 @@ const MOCK_DOWNLOADED_COURSES: DownloadedCourse[] = [
         id: "1-2",
         title: "Équations linéaires",
         duration: "20 min",
+        size: "52 MB",
         isCompleted: true,
+        isDownloaded: true,
         type: 'video',
         mediaUrl: 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
       },
@@ -71,7 +49,9 @@ const MOCK_DOWNLOADED_COURSES: DownloadedCourse[] = [
         id: "1-3",
         title: "Systèmes d'équations",
         duration: "25 min",
+        size: "8 MB",
         isCompleted: false,
+        isDownloaded: true,
         type: 'audio',
         mediaUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
       },
@@ -79,7 +59,9 @@ const MOCK_DOWNLOADED_COURSES: DownloadedCourse[] = [
         id: "1-4",
         title: "Fonctions quadratiques - Guide PDF",
         duration: "30 min",
+        size: "3 MB",
         isCompleted: false,
+        isDownloaded: true,
         type: 'pdf',
         mediaUrl: SAMPLE_PDF_URL,
       },
@@ -95,7 +77,9 @@ const MOCK_DOWNLOADED_COURSES: DownloadedCourse[] = [
         id: "2-1",
         title: "L'empire du Mali",
         duration: "18 min",
+        size: "38 MB",
         isCompleted: true,
+        isDownloaded: true,
         type: 'video',
         mediaUrl: 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
       },
@@ -103,7 +87,9 @@ const MOCK_DOWNLOADED_COURSES: DownloadedCourse[] = [
         id: "2-2",
         title: "Le royaume de Songhaï",
         duration: "22 min",
+        size: "6 MB",
         isCompleted: false,
+        isDownloaded: true,
         type: 'audio',
         mediaUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
       },
@@ -111,7 +97,9 @@ const MOCK_DOWNLOADED_COURSES: DownloadedCourse[] = [
         id: "2-3",
         title: "Les royaumes côtiers - Documentation",
         duration: "20 min",
+        size: "2 MB",
         isCompleted: false,
+        isDownloaded: true,
         type: 'pdf',
         mediaUrl: SAMPLE_PDF_URL,
       },
@@ -156,6 +144,9 @@ export default function Downloads() {
   const [notifiedCourses, setNotifiedCourses] = useState<Set<string>>(new Set());
 
   const totalDownloads = downloadedCourses.length + downloadedBooks.length;
+
+  // Calculate storage status
+  const storageStatus = getStorageStatus(downloadedCourses, downloadedBooks);
 
   // Handle incoming tab parameter from navigation
   useEffect(() => {
@@ -577,6 +568,45 @@ export default function Downloads() {
           </View>
         </ImageBackground>
 
+        {/* Storage Usage Bar */}
+        {totalDownloads > 0 && (
+          <View style={styles.storageBarContainer}>
+            <View style={styles.storageBarHeader}>
+              <Ionicons name="cloud-done-outline" size={20} color="#1E3A5F" />
+              <Text style={styles.storageBarTitle}>Stockage utilisé</Text>
+            </View>
+            <View style={styles.storageBarProgressContainer}>
+              <View style={styles.storageBarTrack}>
+                <View
+                  style={[
+                    styles.storageBarFill,
+                    {
+                      width: `${storageStatus.usagePercentage}%`,
+                      backgroundColor:
+                        storageStatus.usagePercentage > 80
+                          ? "#DC3545"
+                          : storageStatus.usagePercentage > 50
+                          ? "#FFC107"
+                          : "#17A2B8",
+                    },
+                  ]}
+                />
+              </View>
+              <Text style={styles.storageBarText}>
+                {storageStatus.usedFormatted} / {storageStatus.totalFormatted}
+              </Text>
+            </View>
+            {storageStatus.usagePercentage > 80 && (
+              <View style={styles.storageWarning}>
+                <Ionicons name="warning-outline" size={16} color="#DC3545" />
+                <Text style={styles.storageWarningText}>
+                  Espace faible - Supprimez des contenus pour libérer de l&apos;espace
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
+
         {/* Filter Tabs */}
         <View style={styles.tabsContainer}>
           <TouchableOpacity
@@ -679,6 +709,69 @@ const styles = StyleSheet.create({
     textShadowColor: "rgba(0, 0, 0, 0.2)",
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
+  },
+
+  // Storage Bar
+  storageBarContainer: {
+    backgroundColor: "#FFFFFF",
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 8,
+    padding: 16,
+    borderRadius: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  storageBarHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+    gap: 8,
+  },
+  storageBarTitle: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#1E3A5F",
+  },
+  storageBarProgressContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  storageBarTrack: {
+    flex: 1,
+    height: 8,
+    backgroundColor: "#E0E0E0",
+    borderRadius: 4,
+    overflow: "hidden",
+  },
+  storageBarFill: {
+    height: "100%",
+    borderRadius: 4,
+  },
+  storageBarText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#5A5A5A",
+    minWidth: 110,
+  },
+  storageWarning: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#FFE5E5",
+    gap: 6,
+  },
+  storageWarningText: {
+    flex: 1,
+    fontSize: 12,
+    color: "#DC3545",
+    fontWeight: "500",
   },
 
   // Tabs

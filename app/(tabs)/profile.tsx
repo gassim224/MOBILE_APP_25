@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  Animated,
 } from "react-native";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -19,6 +20,7 @@ import {
   testNextSessionNotification,
   testLowStorageNotification,
 } from "@/utils/notificationService";
+import { useConnectionSimulator } from "@/contexts/ConnectionSimulatorContext";
 import logger from "@/utils/Logger";
 
 interface UserProfile {
@@ -31,6 +33,10 @@ interface UserProfile {
 export default function Profile() {
   const router = useRouter();
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const { isConnectedToKiosk } = useConnectionSimulator();
+  const [isSyncing, setIsSyncing] = useState(false);
+  const fadeAnim = useRef(new Animated.Value(1)).current;
+  const previousConnectionState = useRef(isConnectedToKiosk);
 
   const loadUserProfile = useCallback(async () => {
     try {
@@ -49,6 +55,35 @@ export default function Profile() {
   useEffect(() => {
     loadUserProfile();
   }, [loadUserProfile]);
+
+  // Handle sync animation when connection changes from offline to online
+  useEffect(() => {
+    if (previousConnectionState.current === false && isConnectedToKiosk === true) {
+      // Connection just came online - show syncing animation
+      setIsSyncing(true);
+
+      // Pulse animation
+      Animated.sequence([
+        Animated.timing(fadeAnim, {
+          toValue: 0.5,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+      ]).start();
+
+      // Show "Synchronisation en cours..." for 2 seconds
+      setTimeout(() => {
+        setIsSyncing(false);
+      }, 2000);
+    }
+
+    previousConnectionState.current = isConnectedToKiosk;
+  }, [isConnectedToKiosk, fadeAnim]);
 
   const handleLogout = () => {
     Alert.alert(
@@ -230,6 +265,56 @@ export default function Profile() {
                 </View>
               </View>
             </View>
+          </View>
+
+          {/* Sync Status */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Statut de Synchronisation</Text>
+            <Animated.View
+              style={[
+                styles.syncCard,
+                isConnectedToKiosk ? styles.syncCardOnline : styles.syncCardOffline,
+                { opacity: fadeAnim },
+              ]}
+            >
+              <View style={styles.syncIconContainer}>
+                {isSyncing ? (
+                  <Ionicons name="sync" size={32} color="#FFD700" />
+                ) : isConnectedToKiosk ? (
+                  <Ionicons name="checkmark-circle" size={32} color="#4CAF50" />
+                ) : (
+                  <Ionicons name="time-outline" size={32} color="#FF9800" />
+                )}
+              </View>
+              <View style={styles.syncTextContainer}>
+                <Text style={styles.syncTitle}>
+                  {isSyncing
+                    ? "Synchronisation en cours..."
+                    : isConnectedToKiosk
+                    ? "Synchronisé"
+                    : "Données en attente"}
+                </Text>
+                <Text style={styles.syncDescription}>
+                  {isSyncing
+                    ? "Mise à jour de vos données..."
+                    : isConnectedToKiosk
+                    ? "Toutes vos données sont à jour"
+                    : "Connectez-vous pour synchroniser"}
+                </Text>
+              </View>
+              <View
+                style={[
+                  styles.syncStatusBadge,
+                  isConnectedToKiosk
+                    ? styles.syncStatusOnline
+                    : styles.syncStatusOffline,
+                ]}
+              >
+                <Text style={styles.syncStatusText}>
+                  {isConnectedToKiosk ? "🟢 En Ligne" : "🔴 Hors Ligne"}
+                </Text>
+              </View>
+            </Animated.View>
           </View>
 
           {/* Statistics */}
@@ -544,6 +629,66 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#5A5A5A",
     textAlign: "center",
+  },
+  // Sync Status Card
+  syncCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  syncCardOnline: {
+    borderLeftWidth: 4,
+    borderLeftColor: "#4CAF50",
+  },
+  syncCardOffline: {
+    borderLeftWidth: 4,
+    borderLeftColor: "#FF9800",
+  },
+  syncIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#F8F9FA",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  syncTextContainer: {
+    flex: 1,
+  },
+  syncTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#2C2C2C",
+    marginBottom: 4,
+  },
+  syncDescription: {
+    fontSize: 13,
+    color: "#5A5A5A",
+  },
+  syncStatusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    alignSelf: "flex-start",
+    marginTop: 8,
+  },
+  syncStatusOnline: {
+    backgroundColor: "#E8F5E9",
+  },
+  syncStatusOffline: {
+    backgroundColor: "#FFF3E0",
+  },
+  syncStatusText: {
+    fontSize: 12,
+    fontWeight: "600",
   },
   logoutButton: {
     flexDirection: "row",

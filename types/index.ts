@@ -12,6 +12,7 @@ export interface Course {
   title: string;
   description: string;
   thumbnail: string;
+  gradeLevel: string; // e.g., "10ème Année", "11ème Année", "12ème Année"
 }
 
 export interface Lesson {

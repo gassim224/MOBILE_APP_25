@@ -15,28 +15,7 @@ import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useConnectionSimulator } from "@/contexts/ConnectionSimulatorContext";
 import logger from "@/utils/Logger";
-
-interface UserProfile {
-  studentName: string;
-  schoolName: string;
-  grade: string;
-  studentId: string;
-}
-
-interface Course {
-  id: string;
-  title: string;
-  description: string;
-  thumbnail: string;
-}
-
-interface Book {
-  id: string;
-  title: string;
-  author: string;
-  description: string;
-  thumbnail: string;
-}
+import { UserProfile, Course, Book } from "@/types";
 
 interface RecentActivity {
   id: string;
@@ -51,49 +30,56 @@ interface RecentActivity {
 const { width } = Dimensions.get("window");
 const CARD_WIDTH = width * 0.7;
 
-// Mock data
+// Mock data - courses with grade levels
 const MOCK_COURSES: Course[] = [
   {
     id: "1",
     title: "Mathématiques",
     description: "Algèbre et Géométrie",
     thumbnail: "📐",
+    gradeLevel: "10ème Année",
   },
   {
     id: "2",
     title: "Physique",
     description: "Mécanique et Électricité",
     thumbnail: "⚛️",
+    gradeLevel: "10ème Année",
   },
   {
     id: "3",
     title: "Chimie",
     description: "Chimie Organique",
     thumbnail: "🧪",
+    gradeLevel: "11ème Année",
   },
   {
     id: "4",
     title: "Economie",
     description: "Micro et Macroéconomie",
     thumbnail: "📈",
+    gradeLevel: "11ème Année",
   },
   {
     id: "5",
     title: "Philosophie",
     description: "Pensée et Raisonnement",
     thumbnail: "🤔",
+    gradeLevel: "12ème Année",
   },
   {
     id: "6",
     title: "Anglais",
     description: "Langue et Culture",
     thumbnail: "🇬🇧",
+    gradeLevel: "10ème Année",
   },
   {
     id: "7",
     title: "Français",
     description: "Littérature et Grammaire",
     thumbnail: "🇫🇷",
+    gradeLevel: "12ème Année",
   },
 ];
 
@@ -175,6 +161,11 @@ export default function Home() {
   useEffect(() => {
     loadUserProfile();
   }, [loadUserProfile]);
+
+  // Filter courses by user's grade level
+  const filteredCourses = userProfile
+    ? MOCK_COURSES.filter(course => course.gradeLevel === userProfile.grade)
+    : MOCK_COURSES;
 
   const handleCoursePress = (course: Course) => {
     router.push({
@@ -437,7 +428,7 @@ export default function Home() {
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={styles.horizontalScroll}
                 >
-                  {MOCK_COURSES.slice(0, 5).map(renderCourseCard)}
+                  {filteredCourses.slice(0, 5).map(renderCourseCard)}
                 </ScrollView>
               </View>
 

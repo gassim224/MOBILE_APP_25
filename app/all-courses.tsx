@@ -1,87 +1,118 @@
+import { useState, useEffect, useCallback } from "react";
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Dimensions } from "react-native";
 import { useRouter } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import ConnectionStatus from "@/components/ConnectionStatus";
 import { useConnectionSimulator } from "@/contexts/ConnectionSimulatorContext";
-
-interface Course {
-  id: string;
-  title: string;
-  description: string;
-  thumbnail: string;
-}
+import { Course, UserProfile } from "@/types";
+import logger from "@/utils/Logger";
 
 const { width } = Dimensions.get("window");
 const CARD_WIDTH = (width - 64) / 2; // 2 columns with padding
 
-// Mock data - same as home screen
+// Mock data - courses with grade levels
 const ALL_COURSES: Course[] = [
   {
     id: "1",
     title: "Mathématiques",
     description: "Algèbre et Géométrie",
     thumbnail: "📐",
+    gradeLevel: "10ème Année",
   },
   {
     id: "2",
     title: "Physique",
     description: "Mécanique et Électricité",
     thumbnail: "⚛️",
+    gradeLevel: "10ème Année",
   },
   {
     id: "3",
     title: "Chimie",
     description: "Chimie Organique",
     thumbnail: "🧪",
+    gradeLevel: "11ème Année",
   },
   {
     id: "4",
     title: "Economie",
     description: "Micro et Macroéconomie",
     thumbnail: "📈",
+    gradeLevel: "11ème Année",
   },
   {
     id: "5",
     title: "Philosophie",
     description: "Pensée et Raisonnement",
     thumbnail: "🤔",
+    gradeLevel: "12ème Année",
   },
   {
     id: "6",
     title: "Anglais",
     description: "Langue et Culture",
     thumbnail: "🇬🇧",
+    gradeLevel: "10ème Année",
   },
   {
     id: "7",
     title: "Français",
     description: "Littérature et Grammaire",
     thumbnail: "🇫🇷",
+    gradeLevel: "12ème Année",
   },
   {
     id: "8",
     title: "Histoire",
     description: "Histoire du Monde",
     thumbnail: "📜",
+    gradeLevel: "10ème Année",
   },
   {
     id: "9",
     title: "Géographie",
     description: "Géographie Mondiale",
     thumbnail: "🌍",
+    gradeLevel: "11ème Année",
   },
   {
     id: "10",
     title: "Biologie",
     description: "Sciences de la Vie",
     thumbnail: "🧬",
+    gradeLevel: "12ème Année",
   },
 ];
 
 export default function AllCourses() {
   const router = useRouter();
   const { isConnectedToKiosk } = useConnectionSimulator();
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+
+  const loadUserProfile = useCallback(async () => {
+    try {
+      const profileData = await AsyncStorage.getItem("userProfile");
+      if (profileData) {
+        setUserProfile(JSON.parse(profileData));
+      } else {
+        router.replace("/login");
+      }
+    } catch (error) {
+      logger.error("Error loading user profile:", error);
+      router.replace("/login");
+    }
+  }, [router]);
+
+  useEffect(() => {
+    loadUserProfile();
+  }, [loadUserProfile]);
+
+  // Filter courses by user's grade level
+  const filteredCourses = userProfile
+    ? ALL_COURSES.filter(course => course.gradeLevel === userProfile.grade)
+    : ALL_COURSES;
 
   const handleCoursePress = (course: Course) => {
     router.push({
@@ -148,9 +179,9 @@ export default function AllCourses() {
             </Text>
           </View>
         ) : (
-          // Online state - show all courses in grid
+          // Online state - show filtered courses in grid
           <FlatList
-            data={ALL_COURSES}
+            data={filteredCourses}
             renderItem={renderCourseCard}
             keyExtractor={(item) => item.id}
             numColumns={2}
