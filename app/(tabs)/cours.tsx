@@ -1,16 +1,11 @@
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Dimensions } from "react-native";
+import React, { useCallback } from "react";
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Dimensions, ListRenderItem } from "react-native";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import ConnectionStatus from "@/components/ConnectionStatus";
 import { useConnectionSimulator } from "@/contexts/ConnectionSimulatorContext";
-
-interface Course {
-  id: string;
-  title: string;
-  description: string;
-  thumbnail: string;
-}
+import { Course } from "@/types";
 
 const { width } = Dimensions.get("window");
 const CARD_WIDTH = (width - 64) / 2; // 2 columns with padding
@@ -79,11 +74,11 @@ const ALL_COURSES: Course[] = [
   },
 ];
 
-export default function Cours() {
+function Cours() {
   const router = useRouter();
   const { isConnectedToKiosk } = useConnectionSimulator();
 
-  const handleCoursePress = (course: Course) => {
+  const handleCoursePress = useCallback((course: Course) => {
     router.push({
       pathname: "/course-detail",
       params: {
@@ -93,9 +88,9 @@ export default function Cours() {
         thumbnail: course.thumbnail,
       },
     });
-  };
+  }, [router]);
 
-  const renderCourseCard = ({ item: course }: { item: Course }) => (
+  const renderCourseCard: ListRenderItem<Course> = useCallback(({ item: course }) => (
     <TouchableOpacity
       style={styles.courseCard}
       activeOpacity={0.8}
@@ -113,7 +108,9 @@ export default function Cours() {
         </Text>
       </View>
     </TouchableOpacity>
-  );
+  ), [handleCoursePress]);
+
+  const keyExtractor = useCallback((item: Course) => item.id, []);
 
   return (
     <>
@@ -144,7 +141,7 @@ export default function Cours() {
           <FlatList
             data={ALL_COURSES}
             renderItem={renderCourseCard}
-            keyExtractor={(item) => item.id}
+            keyExtractor={keyExtractor}
             numColumns={2}
             contentContainerStyle={styles.gridContainer}
             columnWrapperStyle={styles.columnWrapper}
@@ -155,6 +152,8 @@ export default function Cours() {
     </>
   );
 }
+
+export default React.memo(Cours);
 
 const styles = StyleSheet.create({
   container: {

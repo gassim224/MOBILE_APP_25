@@ -1,11 +1,12 @@
 import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
+import { STORAGE_KEYS, TIME_INTERVALS } from '@/constants/AppConstants';
 
 // Storage keys
-const NOTIFICATION_PERMISSION_KEY = 'notificationPermissionRequested';
-const LAST_APP_OPEN_KEY = 'lastAppOpenTimestamp';
-const INACTIVITY_NOTIFICATION_ID_KEY = 'inactivityNotificationId';
+const NOTIFICATION_PERMISSION_KEY = STORAGE_KEYS.NOTIFICATION_PERMISSION;
+const LAST_APP_OPEN_KEY = STORAGE_KEYS.LAST_APP_OPEN;
+const INACTIVITY_NOTIFICATION_ID_KEY = STORAGE_KEYS.INACTIVITY_NOTIFICATION_ID;
 
 // Configure notification behavior
 Notifications.setNotificationHandler({
@@ -119,7 +120,7 @@ async function scheduleInactivityReminder(): Promise<void> {
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-        seconds: 48 * 60 * 60, // 48 hours
+        seconds: TIME_INTERVALS.INACTIVITY_REMINDER,
         repeats: false,
       },
     });
@@ -203,13 +204,13 @@ export async function scheduleLessonContinuationReminder(
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-        seconds: 24 * 60 * 60, // 24 hours
+        seconds: TIME_INTERVALS.LESSON_CONTINUATION_REMINDER,
         repeats: false,
       },
     });
 
     // Save notification ID for this lesson
-    await AsyncStorage.setItem(`lesson_reminder_${lessonId}`, notificationId);
+    await AsyncStorage.setItem(`${STORAGE_KEYS.LESSON_REMINDER_PREFIX}${lessonId}`, notificationId);
 
     console.log('Lesson continuation reminder scheduled:', lessonId, notificationId);
   } catch (error) {
@@ -222,11 +223,11 @@ export async function scheduleLessonContinuationReminder(
  */
 export async function cancelLessonContinuationReminder(lessonId: string): Promise<void> {
   try {
-    const notificationId = await AsyncStorage.getItem(`lesson_reminder_${lessonId}`);
+    const notificationId = await AsyncStorage.getItem(`${STORAGE_KEYS.LESSON_REMINDER_PREFIX}${lessonId}`);
 
     if (notificationId) {
       await Notifications.cancelScheduledNotificationAsync(notificationId);
-      await AsyncStorage.removeItem(`lesson_reminder_${lessonId}`);
+      await AsyncStorage.removeItem(`${STORAGE_KEYS.LESSON_REMINDER_PREFIX}${lessonId}`);
       console.log('Lesson continuation reminder cancelled:', lessonId);
     }
   } catch (error) {
@@ -286,7 +287,7 @@ export async function testInactivityNotification(): Promise<void> {
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-        seconds: 5, // 5 seconds for testing
+        seconds: TIME_INTERVALS.TEST_NOTIFICATION_DELAY,
         repeats: false,
       },
     });
@@ -318,7 +319,7 @@ export async function testCourseCompletionNotification(): Promise<void> {
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-        seconds: 5, // 5 seconds for testing
+        seconds: TIME_INTERVALS.TEST_NOTIFICATION_DELAY,
         repeats: false,
       },
     });
@@ -350,7 +351,7 @@ export async function testLessonContinuationNotification(): Promise<void> {
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-        seconds: 5, // 5 seconds for testing
+        seconds: TIME_INTERVALS.TEST_NOTIFICATION_DELAY,
         repeats: false,
       },
     });

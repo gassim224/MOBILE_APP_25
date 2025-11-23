@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -10,20 +10,29 @@ import {
   ScrollView,
   ActivityIndicator,
   Image,
+  Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { StatusBar } from "expo-status-bar";
+import { TEST_CREDENTIALS, STORAGE_KEYS, TIME_INTERVALS, MESSAGES } from "@/constants/AppConstants";
+import { UserProfile } from "@/types";
 
 export default function Login() {
   const router = useRouter();
-  const [studentId, setStudentId] = useState("eleve1");
-  const [password, setPassword] = useState("1234");
+  const [studentId, setStudentId] = useState<string>(TEST_CREDENTIALS.USERNAME);
+  const [password, setPassword] = useState<string>(TEST_CREDENTIALS.PASSWORD);
   const [loading, setLoading] = useState(false);
+  const [isNavigating, setIsNavigating] = useState(false);
 
-  const handleLogin = async () => {
+  const handleLogin = useCallback(async () => {
     // Validate non-empty inputs
     if (!studentId.trim() || !password.trim()) {
+      return;
+    }
+
+    // Prevent multiple login attempts
+    if (loading || isNavigating) {
       return;
     }
 
@@ -34,13 +43,15 @@ export default function Login() {
       await new Promise((resolve) => setTimeout(resolve, 800));
 
       // Test credentials validation
-      const isTestUser = studentId.trim() === "eleve1" && password.trim() === "1234";
+      const isTestUser =
+        studentId.trim() === TEST_CREDENTIALS.USERNAME &&
+        password.trim() === TEST_CREDENTIALS.PASSWORD;
 
       // Mock session token
       const sessionToken = `mock_token_${Date.now()}`;
 
       // Mock user profile data - use specific data for test user
-      const userProfile = isTestUser
+      const userProfile: UserProfile = isTestUser
         ? {
             studentName: "Élève Test",
             schoolName: "École Démonstration",
@@ -54,20 +65,39 @@ export default function Login() {
             studentId: studentId,
           };
 
-      // Store session token and user profile
-      await AsyncStorage.setItem("sessionToken", sessionToken);
-      await AsyncStorage.setItem("userProfile", JSON.stringify(userProfile));
+      // Store session token and user profile with proper error handling
+      try {
+        await AsyncStorage.setItem(STORAGE_KEYS.SESSION_TOKEN, sessionToken);
+        await AsyncStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(userProfile));
+      } catch (storageError) {
+        console.error("AsyncStorage error:", storageError);
+        Alert.alert(
+          "Erreur",
+          "Impossible de sauvegarder les informations de connexion. Veuillez réessayer.",
+          [{ text: MESSAGES.OK }]
+        );
+        setLoading(false);
+        return;
+      }
 
-      // Navigate to tabs with smooth transition
+      // Navigate to tabs with smooth transition and race condition prevention
+      setIsNavigating(true);
       setTimeout(() => {
-        router.replace("/(tabs)");
-      }, 200);
+        if (isNavigating) {
+          router.replace("/(tabs)");
+        }
+      }, TIME_INTERVALS.LOGIN_TRANSITION_DELAY);
     } catch (error) {
       console.error("Login error:", error);
+      Alert.alert(
+        "Erreur",
+        MESSAGES.LOGIN_ERROR_GENERIC,
+        [{ text: MESSAGES.OK }]
+      );
     } finally {
       setLoading(false);
     }
-  };
+  }, [studentId, password, loading, isNavigating, router]);
 
   return (
     <>

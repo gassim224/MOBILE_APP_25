@@ -1,17 +1,26 @@
 import { Stack, useRouter, useSegments } from "expo-router";
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useRef } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ConnectionSimulatorProvider } from "@/contexts/ConnectionSimulatorContext";
 import { initializeNotificationService, updateLastAppOpenTimestamp } from "@/utils/notificationService";
 import { AppState } from "react-native";
+import { STORAGE_KEYS } from "@/constants/AppConstants";
 
 export default function RootLayout() {
   const router = useRouter();
   const segments = useSegments();
+  const isCheckingAuth = useRef(false);
 
   const checkAuthStatus = useCallback(async () => {
+    // Prevent concurrent auth checks to avoid race conditions
+    if (isCheckingAuth.current) {
+      return;
+    }
+
+    isCheckingAuth.current = true;
+
     try {
-      const sessionToken = await AsyncStorage.getItem("sessionToken");
+      const sessionToken = await AsyncStorage.getItem(STORAGE_KEYS.SESSION_TOKEN);
 
       const inAuthGroup = segments[0] === "(tabs)" || segments[0] === "course-detail" || segments[0] === "all-courses";
 
@@ -24,6 +33,13 @@ export default function RootLayout() {
       }
     } catch (error) {
       console.error("Error checking auth status:", error);
+      // On error, safely navigate to login
+      const currentSegment = segments[0];
+      if (currentSegment !== "login") {
+        router.replace("/login");
+      }
+    } finally {
+      isCheckingAuth.current = false;
     }
   }, [segments, router]);
 

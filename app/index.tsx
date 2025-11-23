@@ -1,26 +1,39 @@
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useRef } from "react";
 import { View, ActivityIndicator } from "react-native";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { STORAGE_KEYS, TIME_INTERVALS } from "@/constants/AppConstants";
 
 export default function Index() {
   const router = useRouter();
+  const hasNavigated = useRef(false);
 
   const checkAuth = useCallback(async () => {
+    // Prevent multiple navigation attempts
+    if (hasNavigated.current) {
+      return;
+    }
+
     try {
-      const sessionToken = await AsyncStorage.getItem("sessionToken");
+      const sessionToken = await AsyncStorage.getItem(STORAGE_KEYS.SESSION_TOKEN);
 
       // Add a small delay for smoother transition
       setTimeout(() => {
-        if (sessionToken) {
-          router.replace("/(tabs)");
-        } else {
-          router.replace("/login");
+        if (!hasNavigated.current) {
+          hasNavigated.current = true;
+          if (sessionToken) {
+            router.replace("/(tabs)");
+          } else {
+            router.replace("/login");
+          }
         }
-      }, 500);
+      }, TIME_INTERVALS.AUTH_CHECK_DELAY);
     } catch (error) {
       console.error("Error checking auth:", error);
-      router.replace("/login");
+      if (!hasNavigated.current) {
+        hasNavigated.current = true;
+        router.replace("/login");
+      }
     }
   }, [router]);
 

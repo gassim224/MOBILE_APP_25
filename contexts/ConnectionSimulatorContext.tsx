@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import NetInfo from "@react-native-community/netinfo";
+import { STORAGE_KEYS, KIOSK_SSID_KEYWORDS } from "@/constants/AppConstants";
 
 interface ConnectionSimulatorContextType {
   isConnectedToKiosk: boolean;
@@ -12,8 +13,8 @@ interface ConnectionSimulatorContextType {
 
 const ConnectionSimulatorContext = createContext<ConnectionSimulatorContextType | undefined>(undefined);
 
-const SIMULATOR_ENABLED_KEY = "@connection_simulator_enabled";
-const SIMULATED_STATE_KEY = "@connection_simulated_state";
+const SIMULATOR_ENABLED_KEY = STORAGE_KEYS.SIMULATOR_ENABLED;
+const SIMULATED_STATE_KEY = STORAGE_KEYS.SIMULATED_STATE;
 
 export function ConnectionSimulatorProvider({ children }: { children: ReactNode }) {
   const [isSimulatorEnabled, setIsSimulatorEnabled] = useState(true); // Always enabled for development
@@ -52,11 +53,9 @@ export function ConnectionSimulatorProvider({ children }: { children: ReactNode 
       if (netInfo.type === "wifi" && netInfo.isConnected) {
         const ssid = netInfo.details && 'ssid' in netInfo.details ? netInfo.details.ssid : null;
 
-        const isKiosk = ssid ?
-          (ssid.toLowerCase().includes("ecole") ||
-           ssid.toLowerCase().includes("school") ||
-           ssid.toLowerCase().includes("kiosk")) :
-          false;
+        const isKiosk = ssid
+          ? KIOSK_SSID_KEYWORDS.some((keyword) => ssid.toLowerCase().includes(keyword))
+          : false;
 
         setRealConnectionState(isKiosk);
       } else {

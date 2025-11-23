@@ -1,14 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { MediaProgress } from '@/types';
+import { STORAGE_KEYS } from '@/constants/AppConstants';
 
-export interface MediaProgress {
-  lessonId: string;
-  position: number; // in milliseconds for audio/video, page number for PDF
-  duration?: number; // total duration in milliseconds (for media only)
-  lastUpdated: string;
-  type: 'video' | 'audio' | 'pdf';
-}
+// Re-export MediaProgress for backward compatibility
+export type { MediaProgress } from '@/types';
 
-const PROGRESS_KEY_PREFIX = '@media_progress_';
+const PROGRESS_KEY_PREFIX = STORAGE_KEYS.MEDIA_PROGRESS_PREFIX;
 
 export const progressStorage = {
   /**

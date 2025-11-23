@@ -1,16 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { sendCourseCompletionNotification } from './notificationService';
+import { CourseProgress } from '@/types';
+import { STORAGE_KEYS } from '@/constants/AppConstants';
 
-interface CourseProgress {
-  courseId: string;
-  courseName: string;
-  totalLessons: number;
-  completedLessons: string[]; // Array of completed lesson IDs
-  lastUpdated: string;
-  notificationSent: boolean; // Track if completion notification was already sent
-}
-
-const COURSE_PROGRESS_KEY = 'course_progress_';
+const COURSE_PROGRESS_KEY = STORAGE_KEYS.COURSE_PROGRESS_PREFIX;
 
 /**
  * Get course progress from storage

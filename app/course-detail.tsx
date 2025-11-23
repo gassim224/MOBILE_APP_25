@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -11,15 +11,8 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useConnectionSimulator } from "@/contexts/ConnectionSimulatorContext";
-
-interface Lesson {
-  id: string;
-  title: string;
-  type: "video" | "pdf" | "audio";
-  size: string;
-  duration?: string;
-  isDownloaded: boolean;
-}
+import { Lesson } from "@/types";
+import { MESSAGES, TIME_INTERVALS } from "@/constants/AppConstants";
 
 // Mock lessons data for a course
 const MOCK_LESSONS: Lesson[] = [
@@ -95,9 +88,27 @@ export default function CourseDetail() {
   const [downloadingLessonId, setDownloadingLessonId] = useState<string | null>(null);
   const [downloadingAll, setDownloadingAll] = useState(false);
 
-  const courseTitle = (params.title as string) || "Cours";
-  const courseDescription = (params.description as string) || "";
-  const courseThumbnail = (params.thumbnail as string) || "📚";
+  // Validate and extract navigation params with proper typing
+  const courseTitle = (params.title as string | undefined) || "Cours";
+  const courseDescription = (params.description as string | undefined) || "";
+  const courseThumbnail = (params.thumbnail as string | undefined) || "📚";
+  // const courseId = (params.id as string | undefined) || "unknown"; // Reserved for future use
+
+  // Validate required params on mount
+  useEffect(() => {
+    if (!params.title) {
+      Alert.alert(
+        "Erreur",
+        "Les informations du cours sont manquantes.",
+        [
+          {
+            text: MESSAGES.OK,
+            onPress: () => router.back(),
+          },
+        ]
+      );
+    }
+  }, [params.title, router]);
 
   const totalSize = lessons.reduce((sum, lesson) => {
     const size = parseFloat(lesson.size);
@@ -124,60 +135,80 @@ export default function CourseDetail() {
     if (!isConnectedToKiosk) {
       Alert.alert(
         "Hors ligne",
-        "Vous devez être connecté au kiosque pour télécharger du contenu.",
-        [{ text: "OK" }]
+        MESSAGES.DOWNLOAD_ERROR_OFFLINE,
+        [{ text: MESSAGES.OK }]
       );
       return;
     }
 
     setDownloadingLessonId(lessonId);
 
-    // Simulate download
-    setTimeout(() => {
-      setLessons((prev) =>
-        prev.map((l) => (l.id === lessonId ? { ...l, isDownloaded: true } : l))
-      );
+    // Simulate download with error handling
+    try {
+      setTimeout(() => {
+        setLessons((prev) =>
+          prev.map((l) => (l.id === lessonId ? { ...l, isDownloaded: true } : l))
+        );
+        setDownloadingLessonId(null);
+      }, TIME_INTERVALS.DOWNLOAD_SIMULATION);
+    } catch (error) {
+      console.error("Download error:", error);
       setDownloadingLessonId(null);
-    }, 2000);
+      Alert.alert(
+        "Erreur",
+        "Impossible de télécharger la leçon. Veuillez réessayer.",
+        [{ text: MESSAGES.OK }]
+      );
+    }
   };
 
   const handleDownloadAllCourse = () => {
     if (!isConnectedToKiosk) {
       Alert.alert(
         "Hors ligne",
-        "Vous devez être connecté au kiosque pour télécharger du contenu.",
-        [{ text: "OK" }]
+        MESSAGES.DOWNLOAD_ERROR_OFFLINE,
+        [{ text: MESSAGES.OK }]
       );
       return;
     }
 
     if (downloadedCount === totalCount) {
-      Alert.alert("Déjà téléchargé", "Toutes les leçons sont déjà téléchargées.", [
-        { text: "OK" },
+      Alert.alert("Déjà téléchargé", MESSAGES.DOWNLOAD_ALL_ALREADY, [
+        { text: MESSAGES.OK },
       ]);
       return;
     }
 
     Alert.alert(
-      "Télécharger tout le cours",
+      MESSAGES.DOWNLOAD_ALL_CONFIRM,
       `Voulez-vous télécharger toutes les ${totalCount} leçons (environ ${totalSize.toFixed(1)} MB) ?`,
       [
-        { text: "Annuler", style: "cancel" },
+        { text: MESSAGES.CANCEL, style: "cancel" },
         {
-          text: "Télécharger",
+          text: MESSAGES.DOWNLOAD,
           onPress: () => {
             setDownloadingAll(true);
 
-            // Simulate download
-            setTimeout(() => {
-              setLessons((prev) => prev.map((l) => ({ ...l, isDownloaded: true })));
+            // Simulate download with error handling
+            try {
+              setTimeout(() => {
+                setLessons((prev) => prev.map((l) => ({ ...l, isDownloaded: true })));
+                setDownloadingAll(false);
+                Alert.alert(
+                  MESSAGES.DOWNLOAD_COMPLETE,
+                  MESSAGES.DOWNLOAD_COMPLETE_MESSAGE,
+                  [{ text: MESSAGES.OK }]
+                );
+              }, TIME_INTERVALS.DOWNLOAD_ALL_SIMULATION);
+            } catch (error) {
+              console.error("Download all error:", error);
               setDownloadingAll(false);
               Alert.alert(
-                "Téléchargement terminé",
-                "Toutes les leçons ont été téléchargées avec succès !",
-                [{ text: "OK" }]
+                "Erreur",
+                "Impossible de télécharger les leçons. Veuillez réessayer.",
+                [{ text: MESSAGES.OK }]
               );
-            }, 3000);
+            }
           },
         },
       ]
