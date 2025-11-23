@@ -14,7 +14,6 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useConnectionSimulator } from "@/contexts/ConnectionSimulatorContext";
-import { SAMPLE_PDF_URL } from "@/constants/SampleData";
 
 interface UserProfile {
   studentName: string;
@@ -195,24 +194,19 @@ export default function Home() {
 
   const handleRecentActivityPress = (activity: RecentActivity) => {
     if (activity.type === "course") {
+      // Navigate to Downloads screen with Cours tab
       router.push({
-        pathname: "/course-detail",
+        pathname: "/(tabs)/downloads",
         params: {
-          id: activity.id,
-          title: activity.title,
-          description: activity.subtitle,
-          thumbnail: activity.thumbnail,
+          tab: "cours",
         },
       });
     } else {
-      // Navigate to book reader - open PDF for downloaded eBooks
+      // Navigate to Downloads screen with Bibliothèque tab
       router.push({
-        pathname: "/(modals)/pdf-reader",
+        pathname: "/(tabs)/downloads",
         params: {
-          itemId: activity.id,
-          itemTitle: activity.title,
-          pdfUrl: SAMPLE_PDF_URL,
-          itemType: "book",
+          tab: "bibliotheque",
         },
       });
     }

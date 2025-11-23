@@ -8,7 +8,7 @@ import {
   ImageBackground,
   Alert,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { SAMPLE_PDF_URL } from "@/constants/SampleData";
@@ -147,6 +147,7 @@ const MOCK_DOWNLOADED_BOOKS: DownloadedBook[] = [
 
 export default function Downloads() {
   const router = useRouter();
+  const params = useLocalSearchParams();
   const [activeTab, setActiveTab] = useState<FilterTab>("cours");
   const [expandedCourses, setExpandedCourses] = useState<Set<string>>(new Set());
   const [downloadedCourses, setDownloadedCourses] = useState<DownloadedCourse[]>(MOCK_DOWNLOADED_COURSES);
@@ -154,6 +155,14 @@ export default function Downloads() {
   const [notifiedCourses, setNotifiedCourses] = useState<Set<string>>(new Set());
 
   const totalDownloads = downloadedCourses.length + downloadedBooks.length;
+
+  // Handle incoming tab parameter from navigation
+  useEffect(() => {
+    const tabParam = params.tab as string | undefined;
+    if (tabParam === "cours" || tabParam === "bibliotheque") {
+      setActiveTab(tabParam);
+    }
+  }, [params.tab]);
 
   // Monitor course completion and send notifications
   useEffect(() => {
