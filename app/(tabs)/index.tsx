@@ -28,7 +28,7 @@ interface RecentActivity {
 }
 
 const { width } = Dimensions.get("window");
-const CARD_WIDTH = width * 0.7;
+const CARD_WIDTH = width * 0.38; // Unified card width for both courses and books
 
 // Mock data - courses with grade levels
 const MOCK_COURSES: Course[] = [
@@ -230,14 +230,12 @@ export default function Home() {
       <View style={styles.courseThumbnail}>
         <Text style={styles.thumbnailEmoji}>{course.thumbnail}</Text>
       </View>
-      <View style={styles.courseInfo}>
-        <Text style={styles.courseTitle} numberOfLines={2}>
-          {course.title}
-        </Text>
-        <Text style={styles.courseDescription} numberOfLines={1}>
-          {course.description}
-        </Text>
-      </View>
+      <Text style={styles.courseTitle} numberOfLines={2}>
+        {course.title}
+      </Text>
+      <Text style={styles.courseDescription} numberOfLines={1}>
+        {course.description}
+      </Text>
     </TouchableOpacity>
   );
 
@@ -540,36 +538,37 @@ const styles = StyleSheet.create({
   courseCard: {
     width: CARD_WIDTH,
     backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    overflow: "hidden",
+    borderRadius: 12,
+    padding: 12,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
   },
   courseThumbnail: {
     width: "100%",
-    height: 140,
+    aspectRatio: 0.9,
     backgroundColor: "#1E3A5F",
+    borderRadius: 8,
     justifyContent: "center",
     alignItems: "center",
+    marginBottom: 8,
   },
   thumbnailEmoji: {
-    fontSize: 64,
-  },
-  courseInfo: {
-    padding: 16,
+    fontSize: 40,
   },
   courseTitle: {
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: "700",
     color: "#2C2C2C",
-    marginBottom: 6,
+    marginBottom: 4,
+    lineHeight: 18,
   },
   courseDescription: {
-    fontSize: 14,
+    fontSize: 12,
     color: "#5A5A5A",
+    fontStyle: "italic",
   },
   quickActionsSection: {
     paddingHorizontal: 24,
@@ -707,7 +706,7 @@ const styles = StyleSheet.create({
 
   // Book Cards
   bookCard: {
-    width: CARD_WIDTH * 0.6,
+    width: CARD_WIDTH,
     backgroundColor: "#FFFFFF",
     borderRadius: 12,
     padding: 12,

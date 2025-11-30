@@ -57,13 +57,13 @@ export default function Login() {
         ? {
             studentName: "Élève Test",
             schoolName: "École Démonstration",
-            grade: "10",
+            grade: "10ème Année",
             studentId: studentId,
           }
         : {
             studentName: "Amara",
             schoolName: "Le Grand Lycée",
-            grade: "10",
+            grade: "10ème Année",
             studentId: studentId,
           };
 
