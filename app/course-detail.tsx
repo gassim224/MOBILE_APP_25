@@ -78,7 +78,56 @@ const MOCK_LESSONS: Lesson[] = [
     size: "3.5 MB",
     isDownloaded: false,
   },
+  {
+    id: "l9",
+    title: "Guide de révision",
+    type: "pdf",
+    size: "4.2 MB",
+    isDownloaded: false,
+  },
+  {
+    id: "l10",
+    title: "Exercices de pratique - Niveau 1",
+    type: "pdf",
+    size: "2.1 MB",
+    isDownloaded: false,
+  },
+  {
+    id: "l11",
+    title: "Exercices de pratique - Niveau 2",
+    type: "pdf",
+    size: "2.5 MB",
+    isDownloaded: false,
+  },
 ];
+
+type TabType = 'lessons' | 'texts' | 'exercises';
+
+// Categorize lessons based on type and title
+const categorizeLessons = (lessons: Lesson[]) => {
+  const categorized = {
+    lessons: [] as Lesson[],
+    texts: [] as Lesson[],
+    exercises: [] as Lesson[],
+  };
+
+  lessons.forEach((lesson) => {
+    // Check if it's an exercise based on title
+    const isExercise = lesson.title.toLowerCase().includes('exercice');
+
+    if (lesson.type === 'video' || lesson.type === 'audio') {
+      categorized.lessons.push(lesson);
+    } else if (lesson.type === 'pdf') {
+      if (isExercise) {
+        categorized.exercises.push(lesson);
+      } else {
+        categorized.texts.push(lesson);
+      }
+    }
+  });
+
+  return categorized;
+};
 
 export default function CourseDetail() {
   const router = useRouter();
@@ -88,6 +137,7 @@ export default function CourseDetail() {
   const [lessons, setLessons] = useState<Lesson[]>(MOCK_LESSONS);
   const [downloadingLessonId, setDownloadingLessonId] = useState<string | null>(null);
   const [downloadingAll, setDownloadingAll] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabType>('lessons');
 
   // Validate and extract navigation params with proper typing
   const courseTitle = (params.title as string | undefined) || "Cours";
@@ -110,6 +160,25 @@ export default function CourseDetail() {
       );
     }
   }, [params.title, router]);
+
+  // Categorize lessons
+  const categorizedLessons = categorizeLessons(lessons);
+
+  // Get active category lessons
+  const getActiveCategoryLessons = () => {
+    switch (activeTab) {
+      case 'lessons':
+        return categorizedLessons.lessons;
+      case 'texts':
+        return categorizedLessons.texts;
+      case 'exercises':
+        return categorizedLessons.exercises;
+      default:
+        return [];
+    }
+  };
+
+  const activeCategoryLessons = getActiveCategoryLessons();
 
   const totalSize = lessons.reduce((sum, lesson) => {
     const size = parseFloat(lesson.size);
@@ -216,6 +285,59 @@ export default function CourseDetail() {
     );
   };
 
+  const renderTabs = () => {
+    const tabs = [
+      { key: 'lessons' as TabType, label: 'Leçons', icon: 'play-circle', count: categorizedLessons.lessons.length },
+      { key: 'texts' as TabType, label: 'Textes', icon: 'document-text', count: categorizedLessons.texts.length },
+      { key: 'exercises' as TabType, label: 'Exercices', icon: 'pencil', count: categorizedLessons.exercises.length },
+    ];
+
+    return (
+      <View style={styles.tabsContainer}>
+        {tabs.map((tab) => (
+          <TouchableOpacity
+            key={tab.key}
+            style={[
+              styles.tab,
+              activeTab === tab.key && styles.tabActive,
+            ]}
+            onPress={() => setActiveTab(tab.key)}
+            activeOpacity={0.7}
+          >
+            <Ionicons
+              name={tab.icon as any}
+              size={20}
+              color={activeTab === tab.key ? '#1E3A5F' : '#5A5A5A'}
+            />
+            <Text
+              style={[
+                styles.tabText,
+                activeTab === tab.key && styles.tabTextActive,
+              ]}
+            >
+              {tab.label}
+            </Text>
+            <View
+              style={[
+                styles.tabBadge,
+                activeTab === tab.key && styles.tabBadgeActive,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.tabBadgeText,
+                  activeTab === tab.key && styles.tabBadgeTextActive,
+                ]}
+              >
+                {tab.count}
+              </Text>
+            </View>
+          </TouchableOpacity>
+        ))}
+      </View>
+    );
+  };
+
   const renderLesson = (lesson: Lesson) => {
     const isDownloading = downloadingLessonId === lesson.id || downloadingAll;
 
@@ -263,6 +385,21 @@ export default function CourseDetail() {
             />
           </TouchableOpacity>
         )}
+      </View>
+    );
+  };
+
+  const renderEmptyState = () => {
+    const emptyMessages = {
+      lessons: 'Aucune leçon disponible pour ce cours',
+      texts: 'Aucun texte disponible pour ce cours',
+      exercises: 'Aucun exercice disponible pour ce cours',
+    };
+
+    return (
+      <View style={styles.emptyState}>
+        <Ionicons name="folder-open-outline" size={64} color="#A0A0A0" />
+        <Text style={styles.emptyStateText}>{emptyMessages[activeTab]}</Text>
       </View>
     );
   };
@@ -353,14 +490,20 @@ export default function CourseDetail() {
           )}
         </View>
 
-        {/* Lessons List */}
+        {/* Tabs */}
+        {renderTabs()}
+
+        {/* Content List */}
         <ScrollView
           style={styles.content}
           contentContainerStyle={styles.contentContainer}
           showsVerticalScrollIndicator={false}
         >
-          <Text style={styles.lessonsTitle}>Leçons du cours</Text>
-          {lessons.map(renderLesson)}
+          {activeCategoryLessons.length > 0 ? (
+            activeCategoryLessons.map(renderLesson)
+          ) : (
+            renderEmptyState()
+          )}
         </ScrollView>
       </View>
     </>
@@ -557,5 +700,76 @@ const styles = StyleSheet.create({
   },
   downloadButtonDisabled: {
     backgroundColor: "#F8F9FA",
+  },
+  tabsContainer: {
+    flexDirection: "row",
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E0E0E0",
+    gap: 8,
+  },
+  tab: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderRadius: 10,
+    backgroundColor: "#F8F9FA",
+    gap: 6,
+  },
+  tabActive: {
+    backgroundColor: "#FFD700",
+    shadowColor: "#FFD700",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  tabText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#5A5A5A",
+  },
+  tabTextActive: {
+    color: "#1E3A5F",
+    fontWeight: "700",
+  },
+  tabBadge: {
+    backgroundColor: "#E0E0E0",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+    minWidth: 22,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  tabBadgeActive: {
+    backgroundColor: "#1E3A5F",
+  },
+  tabBadgeText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#5A5A5A",
+  },
+  tabBadgeTextActive: {
+    color: "#FFFFFF",
+  },
+  emptyState: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 60,
+    paddingHorizontal: 40,
+  },
+  emptyStateText: {
+    fontSize: 16,
+    color: "#A0A0A0",
+    textAlign: "center",
+    marginTop: 16,
+    fontWeight: "500",
   },
 });

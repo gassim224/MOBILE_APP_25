@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "fastshot-app",
-    "slug": "fastshot-app",
+    "name": "Bonecole_offline_first",
+    "slug": "bonecole-offline-first",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "expoapp",
+    "scheme": "fastshot",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
@@ -36,7 +36,8 @@
       ]
     ],
     "experiments": {
-      "typedRoutes": true
+      "typedRoutes": true,
+      "baseUrl": ""
     }
   }
 }
