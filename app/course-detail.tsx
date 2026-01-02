@@ -14,6 +14,7 @@ import { useConnectionSimulator } from "@/contexts/ConnectionSimulatorContext";
 import { Lesson } from "@/types";
 import { MESSAGES, TIME_INTERVALS } from "@/constants/AppConstants";
 import logger from "@/utils/Logger";
+import { AcademicBadge } from "@/components/AcademicBadge";
 
 // Mock lessons data for a course
 const MOCK_LESSONS: Lesson[] = [
@@ -142,8 +143,7 @@ export default function CourseDetail() {
   // Validate and extract navigation params with proper typing
   const courseTitle = (params.title as string | undefined) || "Cours";
   const courseDescription = (params.description as string | undefined) || "";
-  const courseThumbnail = (params.thumbnail as string | undefined) || "📚";
-  // const courseId = (params.id as string | undefined) || "unknown"; // Reserved for future use
+  const courseId = (params.id as string | undefined) || "unknown";
 
   // Validate required params on mount
   useEffect(() => {
@@ -419,7 +419,12 @@ export default function CourseDetail() {
               <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
             </TouchableOpacity>
             <View style={styles.headerCenter}>
-              <Text style={styles.courseThumbnail}>{courseThumbnail}</Text>
+              <AcademicBadge
+                id={courseId}
+                type="course"
+                title={courseTitle}
+                size={80}
+              />
             </View>
             <View style={styles.placeholder} />
           </View>
@@ -543,9 +548,6 @@ const styles = StyleSheet.create({
   headerCenter: {
     flex: 1,
     alignItems: "center",
-  },
-  courseThumbnail: {
-    fontSize: 48,
   },
   placeholder: {
     width: 40,

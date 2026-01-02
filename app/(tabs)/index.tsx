@@ -16,6 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useConnectionSimulator } from "@/contexts/ConnectionSimulatorContext";
 import logger from "@/utils/Logger";
 import { UserProfile, Course, Book } from "@/types";
+import { AcademicBadge } from "@/components/AcademicBadge";
 
 interface RecentActivity {
   id: string;
@@ -227,8 +228,13 @@ export default function Home() {
       activeOpacity={0.8}
       onPress={() => handleCoursePress(course)}
     >
-      <View style={styles.courseThumbnail}>
-        <Text style={styles.thumbnailEmoji}>{course.thumbnail}</Text>
+      <View style={styles.courseThumbnailContainer}>
+        <AcademicBadge
+          id={course.id}
+          type="course"
+          title={course.title}
+          size={CARD_WIDTH * 0.9}
+        />
       </View>
       <Text style={styles.courseTitle} numberOfLines={2}>
         {course.title}
@@ -246,8 +252,13 @@ export default function Home() {
       activeOpacity={0.8}
       onPress={() => handleBookPress(book)}
     >
-      <View style={styles.bookCover}>
-        <Text style={styles.bookCoverEmoji}>{book.thumbnail}</Text>
+      <View style={styles.bookCoverContainer}>
+        <AcademicBadge
+          id={book.id}
+          type="book"
+          author={book.author}
+          size={CARD_WIDTH * 0.9}
+        />
       </View>
       <Text style={styles.bookTitle} numberOfLines={2}>
         {book.title}
@@ -265,9 +276,13 @@ export default function Home() {
       activeOpacity={0.8}
       onPress={() => handleRecentActivityPress(activity)}
     >
-      <View style={styles.activityThumbnail}>
-        <Text style={styles.activityEmoji}>{activity.thumbnail}</Text>
-      </View>
+      <AcademicBadge
+        id={activity.id}
+        type={activity.type}
+        title={activity.type === 'course' ? activity.title : undefined}
+        author={activity.type === 'book' ? activity.subtitle : undefined}
+        size={60}
+      />
       <View style={styles.activityInfo}>
         <Text style={styles.activityTitle} numberOfLines={1}>
           {activity.title}
@@ -311,8 +326,13 @@ export default function Home() {
               <Ionicons name="close" size={28} color="#2C2C2C" />
             </TouchableOpacity>
 
-            <View style={styles.modalBookCover}>
-              <Text style={styles.modalBookEmoji}>{selectedBook.thumbnail}</Text>
+            <View style={styles.modalBookCoverContainer}>
+              <AcademicBadge
+                id={selectedBook.id}
+                type="book"
+                author={selectedBook.author}
+                size={120}
+              />
             </View>
 
             <Text style={styles.modalBookTitle}>{selectedBook.title}</Text>
@@ -546,17 +566,12 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 3,
   },
-  courseThumbnail: {
+  courseThumbnailContainer: {
     width: "100%",
     aspectRatio: 0.9,
-    backgroundColor: "#1E3A5F",
-    borderRadius: 8,
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 8,
-  },
-  thumbnailEmoji: {
-    fontSize: 40,
   },
   courseTitle: {
     fontSize: 14,
@@ -635,18 +650,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 8,
     elevation: 3,
-  },
-  activityThumbnail: {
-    width: 60,
-    height: 60,
-    borderRadius: 12,
-    backgroundColor: "#1E3A5F",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 12,
-  },
-  activityEmoji: {
-    fontSize: 32,
+    gap: 12,
   },
   activityInfo: {
     flex: 1,
@@ -716,17 +720,12 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 3,
   },
-  bookCover: {
+  bookCoverContainer: {
     width: "100%",
     aspectRatio: 0.7,
-    backgroundColor: "#17A2B8",
-    borderRadius: 8,
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 8,
-  },
-  bookCoverEmoji: {
-    fontSize: 40,
   },
   bookTitle: {
     fontSize: 14,
@@ -760,23 +759,9 @@ const styles = StyleSheet.create({
     padding: 4,
     marginBottom: 8,
   },
-  modalBookCover: {
-    width: 120,
-    height: 160,
-    backgroundColor: "#17A2B8",
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
+  modalBookCoverContainer: {
     alignSelf: "center",
     marginBottom: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 6,
-  },
-  modalBookEmoji: {
-    fontSize: 64,
   },
   modalBookTitle: {
     fontSize: 22,

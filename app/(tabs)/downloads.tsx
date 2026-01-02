@@ -16,6 +16,7 @@ import { sendCourseCompletionNotification } from "@/utils/notificationService";
 import logger from "@/utils/Logger";
 import { getStorageStatus } from "@/utils/storageUtils";
 import { FilterTab, DownloadedCourse, Lesson, DownloadedBook } from "@/types";
+import { AcademicBadge } from "@/components/AcademicBadge";
 
 // Mock data - populate to test different states
 const MOCK_DOWNLOADED_COURSES: DownloadedCourse[] = [
@@ -450,9 +451,13 @@ export default function Downloads() {
             onPress={() => toggleCourse(course.id)}
             activeOpacity={0.8}
           >
-            <View style={styles.courseThumbnail}>
-              <Text style={styles.courseThumbnailEmoji}>{course.thumbnail}</Text>
-            </View>
+            <AcademicBadge
+              id={course.id}
+              type="course"
+              title={course.title}
+              size={60}
+              style={styles.courseThumbnailBadge}
+            />
 
             <View style={styles.courseHeaderInfo}>
               <Text style={styles.courseTitle}>{course.title}</Text>
@@ -511,9 +516,12 @@ export default function Downloads() {
   const BookItem = memo(({ book }: { book: DownloadedBook }) => {
     return (
       <View style={styles.bookContainer}>
-        <View style={styles.bookCover}>
-          <Text style={styles.bookCoverEmoji}>{book.thumbnail}</Text>
-        </View>
+        <AcademicBadge
+          id={book.id}
+          type="book"
+          author={book.author}
+          size={70}
+        />
         <View style={styles.bookInfo}>
           <Text style={styles.bookTitle}>{book.title}</Text>
           <Text style={styles.bookAuthor}>{book.author}</Text>
@@ -940,17 +948,8 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#DC3545",
   },
-  courseThumbnail: {
-    width: 60,
-    height: 60,
-    borderRadius: 12,
-    backgroundColor: "#1E3A5F",
-    justifyContent: "center",
-    alignItems: "center",
+  courseThumbnailBadge: {
     marginRight: 12,
-  },
-  courseThumbnailEmoji: {
-    fontSize: 32,
   },
   courseHeaderInfo: {
     flex: 1,
@@ -1064,21 +1063,10 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
   },
-  bookCover: {
-    width: 60,
-    height: 80,
-    backgroundColor: "#17A2B8",
-    borderRadius: 8,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 12,
-  },
-  bookCoverEmoji: {
-    fontSize: 32,
-  },
   bookInfo: {
     flex: 1,
     justifyContent: "center",
+    marginLeft: 12,
   },
   bookTitle: {
     fontSize: 16,

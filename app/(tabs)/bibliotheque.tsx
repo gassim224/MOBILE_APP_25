@@ -14,6 +14,7 @@ import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import ConnectionStatus from "@/components/ConnectionStatus";
 import { useConnectionSimulator } from "@/contexts/ConnectionSimulatorContext";
+import { AcademicBadge } from "@/components/AcademicBadge";
 
 interface Book {
   id: string;
@@ -137,8 +138,14 @@ export default function Bibliotheque() {
         activeOpacity={0.8}
         onPress={() => handleBookPress(book)}
       >
-        <View style={[styles.bookCover, isGrayedOut && styles.bookCoverGrayed]}>
-          <Text style={styles.bookCoverEmoji}>{book.thumbnail}</Text>
+        <View style={styles.bookCoverContainer}>
+          <AcademicBadge
+            id={book.id}
+            type="book"
+            author={book.author}
+            size={BOOK_WIDTH * 0.85}
+            style={isGrayedOut ? { opacity: 0.4 } : undefined}
+          />
         </View>
         <Text style={[styles.bookTitle, isGrayedOut && styles.textGrayed]} numberOfLines={2}>
           {book.title}
@@ -179,8 +186,13 @@ export default function Bibliotheque() {
               <Ionicons name="close" size={28} color="#2C2C2C" />
             </TouchableOpacity>
 
-            <View style={styles.modalBookCover}>
-              <Text style={styles.modalBookEmoji}>{selectedBook.thumbnail}</Text>
+            <View style={styles.modalBookCoverContainer}>
+              <AcademicBadge
+                id={selectedBook.id}
+                type="book"
+                author={selectedBook.author}
+                size={120}
+              />
             </View>
 
             <Text style={styles.modalBookTitle}>{selectedBook.title}</Text>
@@ -350,20 +362,12 @@ const styles = StyleSheet.create({
   bookCardGrayed: {
     opacity: 0.5,
   },
-  bookCover: {
+  bookCoverContainer: {
     width: "100%",
     aspectRatio: 0.7,
-    backgroundColor: "#17A2B8",
-    borderRadius: 8,
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 8,
-  },
-  bookCoverGrayed: {
-    backgroundColor: "#A0A0A0",
-  },
-  bookCoverEmoji: {
-    fontSize: 40,
   },
   bookTitle: {
     fontSize: 13,
@@ -408,23 +412,9 @@ const styles = StyleSheet.create({
     padding: 4,
     marginBottom: 8,
   },
-  modalBookCover: {
-    width: 120,
-    height: 160,
-    backgroundColor: "#17A2B8",
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
+  modalBookCoverContainer: {
     alignSelf: "center",
     marginBottom: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 6,
-  },
-  modalBookEmoji: {
-    fontSize: 64,
   },
   modalBookTitle: {
     fontSize: 22,

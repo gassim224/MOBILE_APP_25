@@ -8,6 +8,7 @@ import ConnectionStatus from "@/components/ConnectionStatus";
 import { useConnectionSimulator } from "@/contexts/ConnectionSimulatorContext";
 import { Course, UserProfile } from "@/types";
 import logger from "@/utils/Logger";
+import { AcademicBadge } from "@/components/AcademicBadge";
 
 const { width } = Dimensions.get("window");
 const CARD_WIDTH = (width - 64) / 2; // 2 columns with padding
@@ -132,8 +133,13 @@ export default function AllCourses() {
       activeOpacity={0.8}
       onPress={() => handleCoursePress(course)}
     >
-      <View style={styles.courseThumbnail}>
-        <Text style={styles.thumbnailEmoji}>{course.thumbnail}</Text>
+      <View style={styles.courseThumbnailContainer}>
+        <AcademicBadge
+          id={course.id}
+          type="course"
+          title={course.title}
+          size={CARD_WIDTH * 0.85}
+        />
       </View>
       <View style={styles.courseInfo}>
         <Text style={styles.courseTitle} numberOfLines={2}>
@@ -255,15 +261,12 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
   },
-  courseThumbnail: {
+  courseThumbnailContainer: {
     width: "100%",
     height: 120,
-    backgroundColor: "#1E3A5F",
     justifyContent: "center",
     alignItems: "center",
-  },
-  thumbnailEmoji: {
-    fontSize: 56,
+    padding: 8,
   },
   courseInfo: {
     padding: 12,
