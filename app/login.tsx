@@ -100,6 +100,20 @@ export default function Login() {
     }
   }, [studentId, password, loading, isNavigating, router]);
 
+  const handleSkipToDownloads = useCallback(() => {
+    // Prevent navigation if already navigating
+    if (isNavigating) {
+      return;
+    }
+
+    setIsNavigating(true);
+
+    // Navigate directly to downloads tab
+    setTimeout(() => {
+      router.replace("/(tabs)/downloads");
+    }, 300);
+  }, [isNavigating, router]);
+
   return (
     <>
       <StatusBar style="light" />
@@ -170,6 +184,16 @@ export default function Login() {
               ) : (
                 <Text style={styles.loginButtonText}>Se connecter</Text>
               )}
+            </TouchableOpacity>
+
+            {/* Skip to Downloads Button */}
+            <TouchableOpacity
+              style={styles.skipButton}
+              onPress={handleSkipToDownloads}
+              disabled={isNavigating}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.skipButtonText}>Accéder à mes téléchargements</Text>
             </TouchableOpacity>
           </View>
 
@@ -274,6 +298,20 @@ const styles = StyleSheet.create({
     color: "#1E3A5F", // Academic Blue text on yellow button
     fontSize: 18,
     fontWeight: "700",
+  },
+  skipButton: {
+    backgroundColor: "transparent",
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: "center",
+    marginTop: 16,
+    borderWidth: 2,
+    borderColor: "#1E3A5F", // Academic Blue border
+  },
+  skipButtonText: {
+    color: "#1E3A5F", // Academic Blue text
+    fontSize: 16,
+    fontWeight: "600",
   },
   encouragementContainer: {
     alignItems: "center",
