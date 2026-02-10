@@ -2,6 +2,7 @@ import { Stack, useRouter, useSegments } from "expo-router";
 import { useEffect, useCallback, useRef } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ConnectionSimulatorProvider } from "@/contexts/ConnectionSimulatorContext";
+import { DownloadsProvider } from "@/contexts/DownloadsContext";
 import { initializeNotificationService, updateLastAppOpenTimestamp } from "@/utils/notificationService";
 import { AppState } from "react-native";
 import { STORAGE_KEYS } from "@/constants/AppConstants";
@@ -65,35 +66,37 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <ConnectionSimulatorProvider>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="index" />
-        <Stack.Screen name="login" />
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="course-detail" options={{ presentation: "card" }} />
-        <Stack.Screen name="all-courses" options={{ presentation: "card" }} />
-        <Stack.Screen
-          name="(modals)/video-player"
-          options={{
-            presentation: "fullScreenModal",
-            animation: "fade",
-          }}
-        />
-        <Stack.Screen
-          name="(modals)/audio-player"
-          options={{
-            presentation: "fullScreenModal",
-            animation: "fade",
-          }}
-        />
-        <Stack.Screen
-          name="(modals)/pdf-reader"
-          options={{
-            presentation: "fullScreenModal",
-            animation: "slide_from_bottom",
-          }}
-        />
-      </Stack>
-    </ConnectionSimulatorProvider>
+    <DownloadsProvider>
+      <ConnectionSimulatorProvider>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="index" />
+          <Stack.Screen name="login" />
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="course-detail" options={{ presentation: "card" }} />
+          <Stack.Screen name="all-courses" options={{ presentation: "card" }} />
+          <Stack.Screen
+            name="(modals)/video-player"
+            options={{
+              presentation: "fullScreenModal",
+              animation: "fade",
+            }}
+          />
+          <Stack.Screen
+            name="(modals)/audio-player"
+            options={{
+              presentation: "fullScreenModal",
+              animation: "fade",
+            }}
+          />
+          <Stack.Screen
+            name="(modals)/pdf-reader"
+            options={{
+              presentation: "fullScreenModal",
+              animation: "slide_from_bottom",
+            }}
+          />
+        </Stack>
+      </ConnectionSimulatorProvider>
+    </DownloadsProvider>
   );
 }

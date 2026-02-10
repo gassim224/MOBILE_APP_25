@@ -13,135 +13,26 @@ import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { SAMPLE_PDF_URL } from "@/constants/SampleData";
 import { sendCourseCompletionNotification } from "@/utils/notificationService";
+import { useDownloads } from "@/contexts/DownloadsContext";
 import logger from "@/utils/Logger";
 import { getStorageStatus } from "@/utils/storageUtils";
 import { FilterTab, DownloadedCourse, Lesson, DownloadedBook } from "@/types";
 import { AcademicBadge } from "@/components/AcademicBadge";
 
-// Mock data - populate to test different states
-const MOCK_DOWNLOADED_COURSES: DownloadedCourse[] = [
-  {
-    id: "1",
-    title: "Mathématiques Avancées",
-    thumbnail: "📐",
-    downloadedAt: "Il y a 2 jours",
-    lessons: [
-      {
-        id: "1-1",
-        title: "Introduction à l'algèbre",
-        duration: "15 min",
-        size: "45 MB",
-        isCompleted: true,
-        isDownloaded: true,
-        type: 'video',
-        mediaUrl: 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
-      },
-      {
-        id: "1-2",
-        title: "Équations linéaires",
-        duration: "20 min",
-        size: "52 MB",
-        isCompleted: true,
-        isDownloaded: true,
-        type: 'video',
-        mediaUrl: 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
-      },
-      {
-        id: "1-3",
-        title: "Systèmes d'équations",
-        duration: "25 min",
-        size: "8 MB",
-        isCompleted: false,
-        isDownloaded: true,
-        type: 'audio',
-        mediaUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
-      },
-      {
-        id: "1-4",
-        title: "Fonctions quadratiques - Guide PDF",
-        duration: "30 min",
-        size: "3 MB",
-        isCompleted: false,
-        isDownloaded: true,
-        type: 'pdf',
-        mediaUrl: SAMPLE_PDF_URL,
-      },
-    ],
-  },
-  {
-    id: "2",
-    title: "Histoire Africaine",
-    thumbnail: "🌍",
-    downloadedAt: "Il y a 1 semaine",
-    lessons: [
-      {
-        id: "2-1",
-        title: "L'empire du Mali",
-        duration: "18 min",
-        size: "38 MB",
-        isCompleted: true,
-        isDownloaded: true,
-        type: 'video',
-        mediaUrl: 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
-      },
-      {
-        id: "2-2",
-        title: "Le royaume de Songhaï",
-        duration: "22 min",
-        size: "6 MB",
-        isCompleted: false,
-        isDownloaded: true,
-        type: 'audio',
-        mediaUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
-      },
-      {
-        id: "2-3",
-        title: "Les royaumes côtiers - Documentation",
-        duration: "20 min",
-        size: "2 MB",
-        isCompleted: false,
-        isDownloaded: true,
-        type: 'pdf',
-        mediaUrl: SAMPLE_PDF_URL,
-      },
-    ],
-  },
-];
-
-const MOCK_DOWNLOADED_BOOKS: DownloadedBook[] = [
-  {
-    id: "1",
-    title: "Une si longue lettre",
-    author: "Mariama Bâ",
-    thumbnail: "📕",
-    downloadedAt: "Il y a 3 jours",
-    pdfUrl: SAMPLE_PDF_URL,
-  },
-  {
-    id: "2",
-    title: "L'Enfant noir",
-    author: "Camara Laye",
-    thumbnail: "📗",
-    downloadedAt: "Il y a 1 semaine",
-    pdfUrl: SAMPLE_PDF_URL,
-  },
-  {
-    id: "3",
-    title: "L'alchimiste",
-    author: "Paulo Coelho",
-    thumbnail: "📘",
-    downloadedAt: "Il y a 2 semaines",
-    pdfUrl: SAMPLE_PDF_URL,
-  },
-];
-
 export default function Downloads() {
   const router = useRouter();
   const params = useLocalSearchParams();
+  const {
+    downloadedCourses,
+    downloadedBooks,
+    removeCourse,
+    removeBook,
+    removeLesson,
+    updateCourseProgress,
+    clearAllDownloads
+  } = useDownloads();
   const [activeTab, setActiveTab] = useState<FilterTab>("cours");
   const [expandedCourses, setExpandedCourses] = useState<Set<string>>(new Set());
-  const [downloadedCourses, setDownloadedCourses] = useState<DownloadedCourse[]>(MOCK_DOWNLOADED_COURSES);
-  const [downloadedBooks, setDownloadedBooks] = useState<DownloadedBook[]>(MOCK_DOWNLOADED_BOOKS);
   const [notifiedCourses, setNotifiedCourses] = useState<Set<string>>(new Set());
 
   const totalDownloads = downloadedCourses.length + downloadedBooks.length;
@@ -206,11 +97,9 @@ export default function Downloads() {
         {
           text: "Supprimer",
           style: "destructive",
-          onPress: () => {
-            // Remove course from state
-            setDownloadedCourses((prevCourses) =>
-              prevCourses.filter((course) => course.id !== courseId)
-            );
+          onPress: async () => {
+            // Remove course from downloads context
+            await removeCourse(courseId);
             // Remove from expanded set if it was expanded
             setExpandedCourses((prev) => {
               const newSet = new Set(prev);
@@ -235,11 +124,9 @@ export default function Downloads() {
         {
           text: "Supprimer",
           style: "destructive",
-          onPress: () => {
-            // Remove book from state
-            setDownloadedBooks((prevBooks) =>
-              prevBooks.filter((book) => book.id !== bookId)
-            );
+          onPress: async () => {
+            // Remove book from downloads context
+            await removeBook(bookId);
           },
         },
       ]
@@ -357,26 +244,32 @@ export default function Downloads() {
         {
           text: "Supprimer",
           style: "destructive",
-          onPress: () => {
-            // Remove lesson from the course
-            setDownloadedCourses((prevCourses) =>
-              prevCourses.map((course) => {
-                if (course.id === courseId) {
-                  // Filter out the deleted lesson
-                  const updatedLessons = course.lessons.filter((l) => l.id !== lessonId);
-
-                  // If no lessons remain, we could optionally remove the entire course
-                  // For now, we'll keep the course with 0 lessons
-                  return {
-                    ...course,
-                    lessons: updatedLessons,
-                  };
-                }
-                return course;
-              }).filter((course) => course.lessons.length > 0) // Remove courses with no lessons
-            );
-
+          onPress: async () => {
+            // Remove lesson from downloads context
+            await removeLesson(courseId, lessonId);
             logger.info(`Lesson deleted: ${lessonTitle} from course ${courseId}`);
+          },
+        },
+      ]
+    );
+  };
+
+  const handleClearAllDownloads = () => {
+    Alert.alert(
+      "Tout supprimer",
+      "Voulez-vous vraiment supprimer tous les téléchargements ? Cette action est irréversible.",
+      [
+        {
+          text: "Annuler",
+          style: "cancel",
+        },
+        {
+          text: "Tout supprimer",
+          style: "destructive",
+          onPress: async () => {
+            await clearAllDownloads();
+            setExpandedCourses(new Set());
+            logger.info("All downloads cleared");
           },
         },
       ]
@@ -566,7 +459,18 @@ export default function Downloads() {
         >
           <View style={styles.headerOverlay}>
             <View style={styles.header}>
-              <Text style={styles.headerTitle}>Mes Téléchargements</Text>
+              <View style={styles.headerTitleRow}>
+                <Text style={styles.headerTitle}>Mes Téléchargements</Text>
+                {totalDownloads > 0 && (
+                  <TouchableOpacity
+                    style={styles.clearAllButton}
+                    onPress={handleClearAllDownloads}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="trash-outline" size={20} color="#FFFFFF" />
+                  </TouchableOpacity>
+                )}
+              </View>
               {totalDownloads > 0 && (
                 <Text style={styles.headerSubtitle}>
                   {totalDownloads} élément{totalDownloads > 1 ? "s" : ""} téléchargé{totalDownloads > 1 ? "s" : ""}
@@ -701,14 +605,33 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
     paddingHorizontal: 24,
   },
+  headerTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 4,
+  },
   headerTitle: {
     fontSize: 32,
     fontWeight: "700",
     color: "#FFFFFF",
-    marginBottom: 4,
     textShadowColor: "rgba(0, 0, 0, 0.3)",
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 4,
+    flex: 1,
+  },
+  clearAllButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "rgba(220, 53, 69, 0.9)",
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
   },
   headerSubtitle: {
     fontSize: 14,

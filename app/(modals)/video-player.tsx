@@ -21,11 +21,12 @@ const { width, height } = Dimensions.get('window');
 
 export default function VideoPlayer() {
   const router = useRouter();
-  const { lessonId, lessonTitle, videoUrl } = useLocalSearchParams<{
-    lessonId: string;
-    lessonTitle: string;
-    videoUrl: string;
-  }>();
+  const params = useLocalSearchParams();
+
+  // Handle array parameters from expo-router
+  const lessonId = Array.isArray(params.lessonId) ? params.lessonId[0] : params.lessonId;
+  const lessonTitle = Array.isArray(params.lessonTitle) ? params.lessonTitle[0] : params.lessonTitle;
+  const videoUrl = Array.isArray(params.videoUrl) ? params.videoUrl[0] : params.videoUrl;
 
   const videoRef = useRef<Video>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -35,6 +36,26 @@ export default function VideoPlayer() {
   const [duration, setDuration] = useState(0);
   const [isSeeking, setIsSeeking] = useState(false);
   const hideControlsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Debug: Log video URL
+  useEffect(() => {
+    console.log('=== VIDEO PLAYER DEBUG ===');
+    console.log('Raw params:', params);
+    console.log('lessonId:', lessonId);
+    console.log('lessonTitle:', lessonTitle);
+    console.log('videoUrl:', videoUrl);
+    console.log('videoUrl type:', typeof videoUrl);
+    console.log('========================');
+
+    // Validate video URL
+    if (!videoUrl || videoUrl.trim() === '') {
+      Alert.alert(
+        'URL manquante',
+        'L\'URL de la vidéo est manquante. Veuillez réessayer de télécharger cette leçon.',
+        [{ text: 'OK', onPress: () => router.back() }]
+      );
+    }
+  }, [lessonId, lessonTitle, videoUrl, params, router]);
 
   // Load saved progress on mount
   useEffect(() => {
@@ -100,7 +121,12 @@ export default function VideoPlayer() {
   const handlePlaybackStatusUpdate = (status: AVPlaybackStatus) => {
     if (!status.isLoaded) {
       if (status.error) {
-        Alert.alert('Erreur', 'Impossible de charger la vidéo');
+        console.error('Video playback error:', status.error);
+        Alert.alert(
+          'Erreur de lecture',
+          'Impossible de charger la vidéo. Vérifiez que le fichier est disponible.',
+          [{ text: 'OK', onPress: () => router.back() }]
+        );
       }
       return;
     }
@@ -182,7 +208,12 @@ export default function VideoPlayer() {
   };
 
   // Use a mock video URL for demo purposes
-  const demoVideoUrl = videoUrl || 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
+  const demoVideoUrl = (videoUrl && videoUrl.trim()) || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
+
+  // Debug final URL
+  useEffect(() => {
+    console.log('Final video URL being used:', demoVideoUrl);
+  }, [demoVideoUrl]);
 
   return (
     <View style={styles.container}>
@@ -202,6 +233,9 @@ export default function VideoPlayer() {
           shouldPlay={false}
           onPlaybackStatusUpdate={handlePlaybackStatusUpdate}
           useNativeControls={false}
+          onError={(error) => {
+            console.error('Video component error:', error);
+          }}
         />
 
         {/* Loading Indicator */}

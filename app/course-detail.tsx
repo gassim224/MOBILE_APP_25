@@ -11,8 +11,11 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useConnectionSimulator } from "@/contexts/ConnectionSimulatorContext";
+import { useDownloads } from "@/contexts/DownloadsContext";
 import { Lesson } from "@/types";
-import { MESSAGES, TIME_INTERVALS } from "@/constants/AppConstants";
+import { MESSAGES } from "@/constants/AppConstants";
+import { SAMPLE_PDF_URL, SAMPLE_VIDEO_URL, SAMPLE_AUDIO_URL } from "@/constants/SampleData";
+import { downloadFile, generateFileName } from "@/utils/fileDownloader";
 import logger from "@/utils/Logger";
 import { AcademicBadge } from "@/components/AcademicBadge";
 
@@ -134,6 +137,7 @@ export default function CourseDetail() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const { isConnectedToKiosk } = useConnectionSimulator();
+  const { addDownloadedCourse, downloadedCourses } = useDownloads();
 
   const [lessons, setLessons] = useState<Lesson[]>(MOCK_LESSONS);
   const [downloadingLessonId, setDownloadingLessonId] = useState<string | null>(null);
@@ -180,6 +184,20 @@ export default function CourseDetail() {
 
   const activeCategoryLessons = getActiveCategoryLessons();
 
+  // Sync downloaded state from context
+  useEffect(() => {
+    const downloadedCourse = downloadedCourses.find(c => c.id === courseId);
+    if (downloadedCourse) {
+      setLessons(prev => prev.map(lesson => {
+        const downloadedLesson = downloadedCourse.lessons.find(l => l.id === lesson.id);
+        if (downloadedLesson) {
+          return { ...lesson, isDownloaded: true };
+        }
+        return lesson;
+      }));
+    }
+  }, [downloadedCourses, courseId]);
+
   const totalSize = lessons.reduce((sum, lesson) => {
     const size = parseFloat(lesson.size);
     return sum + size;
@@ -201,7 +219,20 @@ export default function CourseDetail() {
     }
   };
 
-  const handleDownloadLesson = (lessonId: string) => {
+  const getMediaUrlForType = (type: Lesson["type"]): string => {
+    switch (type) {
+      case "video":
+        return SAMPLE_VIDEO_URL;
+      case "pdf":
+        return SAMPLE_PDF_URL;
+      case "audio":
+        return SAMPLE_AUDIO_URL;
+      default:
+        return "";
+    }
+  };
+
+  const handleDownloadLesson = async (lessonId: string) => {
     if (!isConnectedToKiosk) {
       Alert.alert(
         "Hors ligne",
@@ -213,20 +244,88 @@ export default function CourseDetail() {
 
     setDownloadingLessonId(lessonId);
 
-    // Simulate download with error handling
     try {
-      setTimeout(() => {
-        setLessons((prev) =>
-          prev.map((l) => (l.id === lessonId ? { ...l, isDownloaded: true } : l))
-        );
-        setDownloadingLessonId(null);
-      }, TIME_INTERVALS.DOWNLOAD_SIMULATION);
+      // Find the lesson
+      const lesson = lessons.find(l => l.id === lessonId);
+      if (!lesson) {
+        throw new Error('Lesson not found');
+      }
+
+      // Get the remote URL for this lesson type
+      const remoteUrl = getMediaUrlForType(lesson.type);
+
+      // Generate filename
+      const fileName = generateFileName(lessonId, lesson.title, lesson.type);
+
+      logger.info(`Starting download: ${lesson.title}`);
+      logger.info(`Remote URL: ${remoteUrl}`);
+      logger.info(`File name: ${fileName}`);
+
+      // Actually download the file to local storage
+      const localUri = await downloadFile(remoteUrl, fileName, (progress) => {
+        logger.info(`Download progress: ${progress.progress.toFixed(2)}%`);
+      });
+
+      logger.info(`File downloaded to: ${localUri}`);
+
+      // Mark lesson as downloaded in local state
+      setLessons((prev) =>
+        prev.map((l) => (l.id === lessonId ? { ...l, isDownloaded: true } : l))
+      );
+
+      // Create lesson with LOCAL file path
+      const lessonWithLocalFile = {
+        ...lesson,
+        isDownloaded: true,
+        mediaUrl: localUri, // Store LOCAL path, not remote URL
+        isCompleted: false,
+      };
+
+      // Check if course already exists in downloads
+      const existingCourse = downloadedCourses.find(c => c.id === courseId);
+
+      if (existingCourse) {
+        // Update existing course with new lesson
+        const updatedLessons = [...existingCourse.lessons];
+        const lessonIndex = updatedLessons.findIndex(l => l.id === lessonId);
+
+        if (lessonIndex >= 0) {
+          updatedLessons[lessonIndex] = lessonWithLocalFile;
+        } else {
+          updatedLessons.push(lessonWithLocalFile);
+        }
+
+        await addDownloadedCourse({
+          ...existingCourse,
+          lessons: updatedLessons,
+          downloadedAt: new Date().toLocaleDateString('fr-FR', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+          }),
+        });
+      } else {
+        // Create new course with single lesson
+        await addDownloadedCourse({
+          id: courseId,
+          title: courseTitle,
+          thumbnail: "📚",
+          downloadedAt: new Date().toLocaleDateString('fr-FR', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+          }),
+          lessons: [lessonWithLocalFile],
+        });
+      }
+
+      setDownloadingLessonId(null);
     } catch (error) {
       logger.error("Download error:", error);
       setDownloadingLessonId(null);
       Alert.alert(
-        "Erreur",
-        "Impossible de télécharger la leçon. Veuillez réessayer.",
+        "Erreur de téléchargement",
+        "Impossible de télécharger la leçon. Vérifiez votre connexion.",
         [{ text: MESSAGES.OK }]
       );
     }
@@ -256,26 +355,77 @@ export default function CourseDetail() {
         { text: MESSAGES.CANCEL, style: "cancel" },
         {
           text: MESSAGES.DOWNLOAD,
-          onPress: () => {
+          onPress: async () => {
             setDownloadingAll(true);
 
-            // Simulate download with error handling
             try {
-              setTimeout(() => {
-                setLessons((prev) => prev.map((l) => ({ ...l, isDownloaded: true })));
-                setDownloadingAll(false);
-                Alert.alert(
-                  MESSAGES.DOWNLOAD_COMPLETE,
-                  MESSAGES.DOWNLOAD_COMPLETE_MESSAGE,
-                  [{ text: MESSAGES.OK }]
-                );
-              }, TIME_INTERVALS.DOWNLOAD_ALL_SIMULATION);
+              logger.info(`Downloading all ${lessons.length} lessons for course: ${courseTitle}`);
+
+              // Download all lessons and store with LOCAL file paths
+              const lessonsWithLocalFiles = await Promise.all(
+                lessons.map(async (lesson) => {
+                  try {
+                    // Get remote URL for this lesson type
+                    const remoteUrl = getMediaUrlForType(lesson.type);
+
+                    // Generate filename
+                    const fileName = generateFileName(lesson.id, lesson.title, lesson.type);
+
+                    // Download file to local storage
+                    const localUri = await downloadFile(remoteUrl, fileName, (progress) => {
+                      logger.info(`${lesson.title}: ${progress.progress.toFixed(2)}%`);
+                    });
+
+                    logger.info(`Downloaded: ${lesson.title} -> ${localUri}`);
+
+                    return {
+                      ...lesson,
+                      isDownloaded: true,
+                      mediaUrl: localUri, // Store LOCAL path
+                      isCompleted: false,
+                    };
+                  } catch (error) {
+                    logger.error(`Failed to download lesson ${lesson.title}:`, error);
+                    // Return lesson without download if it fails
+                    return {
+                      ...lesson,
+                      isDownloaded: false,
+                      isCompleted: false,
+                    };
+                  }
+                })
+              );
+
+              // Mark all lessons as downloaded in local state
+              setLessons((prev) => prev.map((l) => ({ ...l, isDownloaded: true })));
+
+              // Save to downloads context
+              await addDownloadedCourse({
+                id: courseId,
+                title: courseTitle,
+                thumbnail: "📚",
+                downloadedAt: new Date().toLocaleDateString('fr-FR', {
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric'
+                }),
+                lessons: lessonsWithLocalFiles.filter(l => l.isDownloaded), // Only include successfully downloaded lessons
+              });
+
+              setDownloadingAll(false);
+
+              const successCount = lessonsWithLocalFiles.filter(l => l.isDownloaded).length;
+              Alert.alert(
+                MESSAGES.DOWNLOAD_COMPLETE,
+                `${successCount} sur ${totalCount} leçons téléchargées avec succès.`,
+                [{ text: MESSAGES.OK }]
+              );
             } catch (error) {
               logger.error("Download all error:", error);
               setDownloadingAll(false);
               Alert.alert(
                 "Erreur",
-                "Impossible de télécharger les leçons. Veuillez réessayer.",
+                "Impossible de télécharger toutes les leçons. Certaines leçons n'ont peut-être pas été téléchargées.",
                 [{ text: MESSAGES.OK }]
               );
             }

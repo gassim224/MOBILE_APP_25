@@ -9,14 +9,19 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.bonecole.bonecole-offline-first",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.deb_bilreg.bonecoleofflinefirst"
     },
     "web": {
       "bundler": "metro",
@@ -38,6 +43,13 @@
     "experiments": {
       "typedRoutes": true,
       "baseUrl": ""
+    },
+    "extra": {
+      "router": {},
+      "demoMode": true,
+      "eas": {
+        "projectId": "2fc51a80-3374-4abf-8a53-705144e7859c"
+      }
     }
   }
 }

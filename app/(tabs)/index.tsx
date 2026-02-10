@@ -143,7 +143,7 @@ export default function Home() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
   const [bookModalVisible, setBookModalVisible] = useState(false);
-  const { isConnectedToKiosk, isSimulatorEnabled, setSimulatedConnectionState } = useConnectionSimulator();
+  const { isConnectedToKiosk, isSimulatorEnabled, setSimulatedConnectionState, toggleSimulator } = useConnectionSimulator();
 
   const loadUserProfile = useCallback(async () => {
     try {
@@ -218,7 +218,16 @@ export default function Home() {
   };
 
   const toggleConnectionSimulator = async () => {
-    await setSimulatedConnectionState(!isConnectedToKiosk);
+    try {
+      // Always enable the simulator when user toggles the switch
+      if (!isSimulatorEnabled) {
+        await toggleSimulator();
+      }
+      // Set the simulated connection state
+      await setSimulatedConnectionState(!isConnectedToKiosk);
+    } catch (error) {
+      logger.error("Error toggling connection:", error);
+    }
   };
 
   const renderCourseCard = (course: Course) => (
