@@ -14,6 +14,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useConnectionSimulator } from "@/contexts/ConnectionSimulatorContext";
+import { useDownloads } from "@/contexts/DownloadsContext";
 import logger from "@/utils/Logger";
 import { UserProfile, Course, Book } from "@/types";
 import { AcademicBadge } from "@/components/AcademicBadge";
@@ -140,10 +141,40 @@ const MOCK_RECENT_ACTIVITIES: RecentActivity[] = [
 
 export default function Home() {
   const router = useRouter();
+  const { downloadedCourses, downloadedBooks } = useDownloads();
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
   const [bookModalVisible, setBookModalVisible] = useState(false);
   const { isConnectedToKiosk, isSimulatorEnabled, setSimulatedConnectionState, toggleSimulator } = useConnectionSimulator();
+
+  // Create dynamic recent activities from downloaded content
+  const recentActivities: RecentActivity[] = [
+    // Add downloaded courses
+    ...downloadedCourses.map(course => {
+      const completedLessons = course.lessons.filter(l => l.isCompleted).length;
+      const totalLessons = course.lessons.length;
+      const progress = totalLessons > 0 ? (completedLessons / totalLessons) * 100 : 0;
+
+      return {
+        id: `course-${course.id}`,
+        type: "course" as const,
+        title: course.title,
+        subtitle: `${completedLessons}/${totalLessons} leçons`,
+        thumbnail: course.thumbnail,
+        progress: Math.round(progress),
+        lastAccessed: course.downloadedAt,
+      };
+    }),
+    // Add downloaded books
+    ...downloadedBooks.map(book => ({
+      id: `book-${book.id}`,
+      type: "book" as const,
+      title: book.title,
+      subtitle: book.author,
+      thumbnail: book.thumbnail,
+      lastAccessed: book.downloadedAt,
+    })),
+  ];
 
   const loadUserProfile = useCallback(async () => {
     try {
@@ -403,19 +434,19 @@ export default function Home() {
           contentContainerStyle={styles.contentContainer}
           showsVerticalScrollIndicator={false}
         >
-          {/* Continue Learning Section - Always visible */}
+          {/* Continue Learning Section - Dynamic based on downloads */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Continuer l&apos;apprentissage</Text>
-            {MOCK_RECENT_ACTIVITIES.length === 0 ? (
+            {recentActivities.length === 0 ? (
               <View style={styles.emptyRecentActivity}>
                 <Ionicons name="book-outline" size={48} color="#A0A0A0" />
                 <Text style={styles.emptyRecentText}>
-                  Commencez à apprendre pour voir vos activités récentes ici
+                  Téléchargez des cours ou des livres pour continuer votre apprentissage
                 </Text>
               </View>
             ) : (
               <View style={styles.recentActivityList}>
-                {MOCK_RECENT_ACTIVITIES.map(renderRecentActivityCard)}
+                {recentActivities.map(renderRecentActivityCard)}
               </View>
             )}
           </View>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -6,14 +6,19 @@ import {
   TouchableOpacity,
   TextInput,
   Modal,
-  Dimensions,
+  useWindowDimensions,
   FlatList,
+  Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import ConnectionStatus from "@/components/ConnectionStatus";
 import { useConnectionSimulator } from "@/contexts/ConnectionSimulatorContext";
+import { useDownloads } from "@/contexts/DownloadsContext";
+import { downloadFile, generateFileName } from "@/utils/fileDownloader";
+import { SAMPLE_PDF_URL } from "@/constants/SampleData";
+import logger from "@/utils/Logger";
 import { AcademicBadge } from "@/components/AcademicBadge";
 
 interface Book {
@@ -24,9 +29,6 @@ interface Book {
   thumbnail: string;
   isDownloaded?: boolean;
 }
-
-const { width } = Dimensions.get("window");
-const BOOK_WIDTH = (width - 72) / 3; // 3 columns with padding
 
 // Mock books data
 const MOCK_BOOKS: Book[] = [
@@ -98,11 +100,14 @@ const MOCK_BOOKS: Book[] = [
 export default function Bibliotheque() {
   const router = useRouter();
   const { isConnectedToKiosk } = useConnectionSimulator();
+  const { downloadedBooks, addDownloadedBook } = useDownloads();
+  const { width } = useWindowDimensions();
+  const numColumns = width >= 768 ? 4 : 3;
+  const bookWidth = (width - 72) / numColumns;
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [downloadingBookId, setDownloadingBookId] = useState<string | null>(null);
-  const [downloadedBooks, setDownloadedBooks] = useState<Set<string>>(new Set());
 
   const filteredBooks = MOCK_BOOKS.filter(
     (book) =>
@@ -115,18 +120,53 @@ export default function Bibliotheque() {
     setModalVisible(true);
   };
 
-  const handleDownload = (bookId: string) => {
+  const handleDownload = async (bookId: string) => {
+    const book = MOCK_BOOKS.find(b => b.id === bookId);
+    if (!book) return;
+
     setDownloadingBookId(bookId);
 
-    // Simulate download
-    setTimeout(() => {
-      setDownloadedBooks((prev) => new Set([...prev, bookId]));
+    try {
+      logger.info(`Starting book download: ${book.title}`);
+
+      // Generate filename for the PDF
+      const fileName = generateFileName(bookId, book.title, 'pdf');
+
+      // Actually download the PDF file to local storage
+      const localUri = await downloadFile(SAMPLE_PDF_URL, fileName, (progress) => {
+        logger.info(`Download progress: ${progress.progress.toFixed(2)}%`);
+      });
+
+      logger.info(`Book downloaded to: ${localUri}`);
+
+      // Add to downloads context with LOCAL file path
+      await addDownloadedBook({
+        id: book.id,
+        title: book.title,
+        author: book.author,
+        thumbnail: book.thumbnail,
+        downloadedAt: new Date().toLocaleDateString('fr-FR', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        }),
+        pdfUrl: localUri, // Store LOCAL path
+      });
+
       setDownloadingBookId(null);
       setModalVisible(false);
-    }, 2000);
+    } catch (error) {
+      logger.error("Book download error:", error);
+      setDownloadingBookId(null);
+      Alert.alert(
+        "Erreur de téléchargement",
+        "Impossible de télécharger le livre. Vérifiez votre connexion.",
+        [{ text: "OK" }]
+      );
+    }
   };
 
-  const isBookDownloaded = (bookId: string) => downloadedBooks.has(bookId);
+  const isBookDownloaded = (bookId: string) => downloadedBooks.some(b => b.id === bookId);
 
   const renderBookCard = ({ item: book }: { item: Book }) => {
     const downloaded = isBookDownloaded(book.id);
@@ -134,7 +174,7 @@ export default function Bibliotheque() {
 
     return (
       <TouchableOpacity
-        style={[styles.bookCard, isGrayedOut && styles.bookCardGrayed]}
+        style={[styles.bookCard, { width: bookWidth }, isGrayedOut && styles.bookCardGrayed]}
         activeOpacity={0.8}
         onPress={() => handleBookPress(book)}
       >
@@ -143,7 +183,7 @@ export default function Bibliotheque() {
             id={book.id}
             type="book"
             author={book.author}
-            size={BOOK_WIDTH * 0.85}
+            size={bookWidth * 0.85}
             style={isGrayedOut ? { opacity: 0.4 } : undefined}
           />
         </View>
@@ -279,10 +319,11 @@ export default function Bibliotheque() {
 
         {/* Books Grid */}
         <FlatList
+          key={numColumns}
           data={filteredBooks}
           renderItem={renderBookCard}
           keyExtractor={(item) => item.id}
-          numColumns={3}
+          numColumns={numColumns}
           contentContainerStyle={styles.booksGrid}
           showsVerticalScrollIndicator={false}
           columnWrapperStyle={styles.bookRow}
@@ -349,7 +390,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   bookCard: {
-    width: BOOK_WIDTH,
     backgroundColor: "#FFFFFF",
     borderRadius: 12,
     padding: 12,

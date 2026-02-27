@@ -1,5 +1,5 @@
 import React, { useCallback } from "react";
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Dimensions, ListRenderItem } from "react-native";
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, useWindowDimensions, ListRenderItem } from "react-native";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
@@ -7,9 +7,6 @@ import ConnectionStatus from "@/components/ConnectionStatus";
 import { useConnectionSimulator } from "@/contexts/ConnectionSimulatorContext";
 import { Course } from "@/types";
 import { AcademicBadge } from "@/components/AcademicBadge";
-
-const { width } = Dimensions.get("window");
-const CARD_WIDTH = (width - 64) / 2; // 2 columns with padding
 
 // Mock data - complete course catalog
 const ALL_COURSES: Course[] = [
@@ -88,6 +85,9 @@ const ALL_COURSES: Course[] = [
 function Cours() {
   const router = useRouter();
   const { isConnectedToKiosk } = useConnectionSimulator();
+  const { width } = useWindowDimensions();
+  const numColumns = width >= 768 ? 3 : 2;
+  const cardWidth = (width - 64) / numColumns;
 
   const handleCoursePress = useCallback((course: Course) => {
     router.push({
@@ -103,16 +103,16 @@ function Cours() {
 
   const renderCourseCard: ListRenderItem<Course> = useCallback(({ item: course }) => (
     <TouchableOpacity
-      style={styles.courseCard}
+      style={[styles.courseCard, { width: cardWidth }]}
       activeOpacity={0.8}
       onPress={() => handleCoursePress(course)}
     >
-      <View style={styles.courseThumbnailContainer}>
+      <View style={[styles.courseThumbnailContainer, { height: cardWidth * 0.75 }]}>
         <AcademicBadge
           id={course.id}
           type="course"
           title={course.title}
-          size={CARD_WIDTH * 0.85}
+          size={cardWidth * 0.65}
         />
       </View>
       <View style={styles.courseInfo}>
@@ -124,7 +124,7 @@ function Cours() {
         </Text>
       </View>
     </TouchableOpacity>
-  ), [handleCoursePress]);
+  ), [handleCoursePress, cardWidth]);
 
   const keyExtractor = useCallback((item: Course) => item.id, []);
 
@@ -155,10 +155,11 @@ function Cours() {
         ) : (
           // Online state - show all courses in grid
           <FlatList
+            key={numColumns}
             data={ALL_COURSES}
             renderItem={renderCourseCard}
             keyExtractor={keyExtractor}
-            numColumns={2}
+            numColumns={numColumns}
             contentContainerStyle={styles.gridContainer}
             columnWrapperStyle={styles.columnWrapper}
             showsVerticalScrollIndicator={false}
@@ -209,7 +210,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   courseCard: {
-    width: CARD_WIDTH,
     backgroundColor: "#FFFFFF",
     borderRadius: 16,
     overflow: "hidden",
@@ -221,7 +221,6 @@ const styles = StyleSheet.create({
   },
   courseThumbnailContainer: {
     width: "100%",
-    height: 120,
     justifyContent: "center",
     alignItems: "center",
     padding: 8,

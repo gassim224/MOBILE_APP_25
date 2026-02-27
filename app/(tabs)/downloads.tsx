@@ -1,4 +1,4 @@
-import { useState, useEffect, memo } from "react";
+import { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
+import * as FileSystem from "expo-file-system/legacy";
 import { SAMPLE_PDF_URL } from "@/constants/SampleData";
 import { sendCourseCompletionNotification } from "@/utils/notificationService";
 import { useDownloads } from "@/contexts/DownloadsContext";
@@ -18,6 +19,107 @@ import logger from "@/utils/Logger";
 import { getStorageStatus } from "@/utils/storageUtils";
 import { FilterTab, DownloadedCourse, Lesson, DownloadedBook } from "@/types";
 import { AcademicBadge } from "@/components/AcademicBadge";
+
+// ─── Sub-components defined at module level (stable references, no re-mounting) ───
+
+interface LessonItemProps {
+  lesson: Lesson;
+  courseId: string;
+  onPress: (lesson: Lesson) => void;
+  onDelete: (courseId: string, lessonId: string, lessonTitle: string) => void;
+  getMediaIcon: (type: 'video' | 'audio' | 'pdf') => string;
+}
+
+function LessonItem({ lesson, courseId, onPress, onDelete, getMediaIcon }: LessonItemProps) {
+  return (
+    <View style={styles.lessonItemContainer}>
+      <TouchableOpacity
+        style={styles.lessonItem}
+        activeOpacity={0.7}
+        onPress={() => onPress(lesson)}
+      >
+        <View style={styles.lessonIcon}>
+          <Ionicons
+            name={lesson.isCompleted ? "checkmark-circle" : getMediaIcon(lesson.type) as any}
+            size={24}
+            color={lesson.isCompleted ? "#17A2B8" : "#FFD700"}
+          />
+        </View>
+        <View style={styles.lessonInfo}>
+          <Text
+            style={[
+              styles.lessonTitle,
+              lesson.isCompleted && styles.lessonTitleCompleted,
+            ]}
+          >
+            {lesson.title}
+          </Text>
+          <View style={styles.lessonMeta}>
+            <Text style={styles.lessonDuration}>{lesson.duration}</Text>
+            <View style={styles.lessonTypeBadge}>
+              <Text style={styles.lessonTypeText}>
+                {lesson.type === 'video' ? '🎥 Vidéo' : lesson.type === 'audio' ? '🎵 Audio' : '📄 PDF'}
+              </Text>
+            </View>
+          </View>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color="#A0A0A0" />
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.lessonDeleteButton}
+        onPress={() => onDelete(courseId, lesson.id, lesson.title)}
+        activeOpacity={0.7}
+      >
+        <Ionicons name="trash-outline" size={18} color="#DC3545" />
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+interface BookItemProps {
+  book: DownloadedBook;
+  onRead: (book: DownloadedBook) => void;
+  onDelete: (bookId: string, bookTitle: string) => void;
+}
+
+function BookItem({ book, onRead, onDelete }: BookItemProps) {
+  return (
+    <View style={styles.bookContainer}>
+      <AcademicBadge
+        id={book.id}
+        type="book"
+        author={book.author}
+        size={70}
+      />
+      <View style={styles.bookInfo}>
+        <Text style={styles.bookTitle}>{book.title}</Text>
+        <Text style={styles.bookAuthor}>{book.author}</Text>
+        <Text style={styles.bookDownloadedDate}>{book.downloadedAt}</Text>
+      </View>
+      <View style={styles.bookActions}>
+        <TouchableOpacity
+          style={styles.bookActionButton}
+          activeOpacity={0.7}
+          onPress={() => onRead(book)}
+        >
+          <Ionicons name="book-outline" size={20} color="#1E3A5F" />
+          <Text style={styles.bookActionText}>Lire</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.bookActionButton, styles.deleteButton]}
+          onPress={() => onDelete(book.id, book.title)}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="trash-outline" size={20} color="#DC3545" />
+          <Text style={[styles.bookActionText, styles.deleteText]}>Supprimer</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function Downloads() {
   const router = useRouter();
@@ -187,7 +289,24 @@ export default function Downloads() {
     </View>
   );
 
-  const handleLessonPress = (lesson: Lesson) => {
+  const handleLessonPress = async (lesson: Lesson) => {
+    // Validate the file still exists on device before navigating
+    if (lesson.mediaUrl) {
+      try {
+        const fileInfo = await FileSystem.getInfoAsync(lesson.mediaUrl);
+        if (!fileInfo.exists) {
+          Alert.alert(
+            "Fichier introuvable",
+            "Ce fichier n'est plus disponible sur votre appareil. Veuillez le télécharger à nouveau.",
+            [{ text: "OK" }]
+          );
+          return;
+        }
+      } catch (error) {
+        logger.error("Error checking file existence:", error);
+      }
+    }
+
     if (lesson.type === 'video') {
       router.push({
         pathname: '/(modals)/video-player',
@@ -276,58 +395,15 @@ export default function Downloads() {
     );
   };
 
-  // Memoized lesson item component for better performance
-  const LessonItem = memo(({ lesson, courseId }: { lesson: Lesson; courseId: string }) => {
-    return (
-      <View style={styles.lessonItemContainer}>
-        <TouchableOpacity
-          style={styles.lessonItem}
-          activeOpacity={0.7}
-          onPress={() => handleLessonPress(lesson)}
-        >
-          <View style={styles.lessonIcon}>
-            <Ionicons
-              name={lesson.isCompleted ? "checkmark-circle" : getMediaIcon(lesson.type)}
-              size={24}
-              color={lesson.isCompleted ? "#17A2B8" : "#FFD700"}
-            />
-          </View>
-          <View style={styles.lessonInfo}>
-            <Text
-              style={[
-                styles.lessonTitle,
-                lesson.isCompleted && styles.lessonTitleCompleted,
-              ]}
-            >
-              {lesson.title}
-            </Text>
-            <View style={styles.lessonMeta}>
-              <Text style={styles.lessonDuration}>{lesson.duration}</Text>
-              <View style={styles.lessonTypeBadge}>
-                <Text style={styles.lessonTypeText}>
-                  {lesson.type === 'video' ? '🎥 Vidéo' : lesson.type === 'audio' ? '🎵 Audio' : '📄 PDF'}
-                </Text>
-              </View>
-            </View>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color="#A0A0A0" />
-        </TouchableOpacity>
-
-        {/* Individual Lesson Delete Button */}
-        <TouchableOpacity
-          style={styles.lessonDeleteButton}
-          onPress={() => handleDeleteLesson(courseId, lesson.id, lesson.title)}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="trash-outline" size={18} color="#DC3545" />
-        </TouchableOpacity>
-      </View>
-    );
-  });
-  LessonItem.displayName = 'LessonItem';
-
   const renderLesson = (lesson: Lesson, courseId: string) => (
-    <LessonItem key={lesson.id} lesson={lesson} courseId={courseId} />
+    <LessonItem
+      key={lesson.id}
+      lesson={lesson}
+      courseId={courseId}
+      onPress={handleLessonPress}
+      onDelete={handleDeleteLesson}
+      getMediaIcon={getMediaIcon}
+    />
   );
 
   const renderCourse = (course: DownloadedCourse) => {
@@ -405,46 +481,13 @@ export default function Downloads() {
     });
   };
 
-  // Memoized book item component for better performance
-  const BookItem = memo(({ book }: { book: DownloadedBook }) => {
-    return (
-      <View style={styles.bookContainer}>
-        <AcademicBadge
-          id={book.id}
-          type="book"
-          author={book.author}
-          size={70}
-        />
-        <View style={styles.bookInfo}>
-          <Text style={styles.bookTitle}>{book.title}</Text>
-          <Text style={styles.bookAuthor}>{book.author}</Text>
-          <Text style={styles.bookDownloadedDate}>{book.downloadedAt}</Text>
-        </View>
-        <View style={styles.bookActions}>
-          <TouchableOpacity
-            style={styles.bookActionButton}
-            activeOpacity={0.7}
-            onPress={() => handleBookRead(book)}
-          >
-            <Ionicons name="book-outline" size={20} color="#1E3A5F" />
-            <Text style={styles.bookActionText}>Lire</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.bookActionButton, styles.deleteButton]}
-            onPress={() => handleDeleteBook(book.id, book.title)}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="trash-outline" size={20} color="#DC3545" />
-            <Text style={[styles.bookActionText, styles.deleteText]}>Supprimer</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  });
-  BookItem.displayName = 'BookItem';
-
   const renderBook = (book: DownloadedBook) => (
-    <BookItem key={book.id} book={book} />
+    <BookItem
+      key={book.id}
+      book={book}
+      onRead={handleBookRead}
+      onDelete={handleDeleteBook}
+    />
   );
 
   return (

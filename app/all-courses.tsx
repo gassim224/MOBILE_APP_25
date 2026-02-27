@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Dimensions } from "react-native";
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, useWindowDimensions } from "react-native";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { StatusBar } from "expo-status-bar";
@@ -9,9 +9,6 @@ import { useConnectionSimulator } from "@/contexts/ConnectionSimulatorContext";
 import { Course, UserProfile } from "@/types";
 import logger from "@/utils/Logger";
 import { AcademicBadge } from "@/components/AcademicBadge";
-
-const { width } = Dimensions.get("window");
-const CARD_WIDTH = (width - 64) / 2; // 2 columns with padding
 
 // Mock data - courses with grade levels
 const ALL_COURSES: Course[] = [
@@ -91,6 +88,9 @@ export default function AllCourses() {
   const router = useRouter();
   const { isConnectedToKiosk } = useConnectionSimulator();
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const { width } = useWindowDimensions();
+  const numColumns = width >= 768 ? 3 : 2;
+  const cardWidth = (width - 64) / numColumns;
 
   const loadUserProfile = useCallback(async () => {
     try {
@@ -110,10 +110,7 @@ export default function AllCourses() {
     loadUserProfile();
   }, [loadUserProfile]);
 
-  // Filter courses by user's grade level
-  const filteredCourses = userProfile
-    ? ALL_COURSES.filter(course => course.gradeLevel === userProfile.grade)
-    : ALL_COURSES;
+  const filteredCourses = ALL_COURSES;
 
   const handleCoursePress = (course: Course) => {
     router.push({
@@ -129,16 +126,16 @@ export default function AllCourses() {
 
   const renderCourseCard = ({ item: course }: { item: Course }) => (
     <TouchableOpacity
-      style={styles.courseCard}
+      style={[styles.courseCard, { width: cardWidth }]}
       activeOpacity={0.8}
       onPress={() => handleCoursePress(course)}
     >
-      <View style={styles.courseThumbnailContainer}>
+      <View style={[styles.courseThumbnailContainer, { height: cardWidth * 0.75 }]}>
         <AcademicBadge
           id={course.id}
           type="course"
           title={course.title}
-          size={CARD_WIDTH * 0.85}
+          size={cardWidth * 0.55}
         />
       </View>
       <View style={styles.courseInfo}>
@@ -187,10 +184,11 @@ export default function AllCourses() {
         ) : (
           // Online state - show filtered courses in grid
           <FlatList
+            key={numColumns}
             data={filteredCourses}
             renderItem={renderCourseCard}
             keyExtractor={(item) => item.id}
-            numColumns={2}
+            numColumns={numColumns}
             contentContainerStyle={styles.gridContainer}
             columnWrapperStyle={styles.columnWrapper}
             showsVerticalScrollIndicator={false}
@@ -251,7 +249,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   courseCard: {
-    width: CARD_WIDTH,
     backgroundColor: "#FFFFFF",
     borderRadius: 16,
     overflow: "hidden",
@@ -263,7 +260,6 @@ const styles = StyleSheet.create({
   },
   courseThumbnailContainer: {
     width: "100%",
-    height: 120,
     justifyContent: "center",
     alignItems: "center",
     padding: 8,
