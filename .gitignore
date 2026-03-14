@@ -8,7 +8,8 @@ node_modules/
 dist/
 web-build/
 expo-env.d.ts
-
+logo/
+logo.zip
 # Native
 .kotlin/
 *.orig.*
@@ -45,3 +46,4 @@ app-example
 .fastshot-logs/
 examples/
 CLAUDE.md
+android/local.properties
