@@ -15,14 +15,15 @@ import {
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { StatusBar } from "expo-status-bar";
-import { TEST_CREDENTIALS, STORAGE_KEYS, TIME_INTERVALS, MESSAGES } from "@/constants/AppConstants";
+import { STORAGE_KEYS, MESSAGES } from "@/constants/AppConstants";
 import { UserProfile } from "@/types";
 import logger from "@/utils/Logger";
+import { AuthAPI, ApiError } from "@/services/api";
 
 export default function Login() {
   const router = useRouter();
-  const [studentId, setStudentId] = useState<string>(TEST_CREDENTIALS.USERNAME);
-  const [password, setPassword] = useState<string>(TEST_CREDENTIALS.PASSWORD);
+  const [studentId, setStudentId] = useState<string>("");
+  const [password, setPassword] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
 
@@ -41,35 +42,30 @@ export default function Login() {
     setIsNavigating(true);
 
     try {
-      // Simulate API delay
-      await new Promise((resolve) => setTimeout(resolve, 800));
+      logger.info("Attempting login...");
+      const response = await AuthAPI.login(studentId.trim(), password.trim());
 
-      // Test credentials validation
-      const isTestUser =
-        studentId.trim() === TEST_CREDENTIALS.USERNAME &&
-        password.trim() === TEST_CREDENTIALS.PASSWORD;
+      if (!response.success || !response.token) {
+        setLoading(false);
+        setIsNavigating(false);
+        Alert.alert(
+          "Identifiants incorrects",
+          response.message || "L'identifiant ou le mot de passe est incorrect. Veuillez réessayer.",
+          [{ text: MESSAGES.OK }]
+        );
+        return;
+      }
 
-      // Mock session token
-      const sessionToken = `mock_token_${Date.now()}`;
+      // Create user profile from API response
+      const userProfile: UserProfile = {
+        studentName: response.user?.fullName || response.user?.email || studentId,
+        schoolName: response.user?.schoolName || "École",
+        grade: response.user?.grade || "",
+        studentId: response.user?.studentId || studentId,
+      };
 
-      // Mock user profile data - use specific data for test user
-      const userProfile: UserProfile = isTestUser
-        ? {
-            studentName: "Élève Test",
-            schoolName: "École Démonstration",
-            grade: "10ème Année",
-            studentId: studentId,
-          }
-        : {
-            studentName: "Amara",
-            schoolName: "Le Grand Lycée",
-            grade: "10ème Année",
-            studentId: studentId,
-          };
-
-      // Store session token and user profile with proper error handling
+      // Store user profile (token already stored by AuthAPI.login)
       try {
-        await AsyncStorage.setItem(STORAGE_KEYS.SESSION_TOKEN, sessionToken);
         await AsyncStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(userProfile));
       } catch (storageError) {
         logger.error("AsyncStorage error:", storageError);
@@ -83,17 +79,22 @@ export default function Login() {
         return;
       }
 
-      // Navigate to tabs with smooth transition
       setTimeout(() => {
         router.replace("/(tabs)");
-      }, TIME_INTERVALS.LOGIN_TRANSITION_DELAY);
+      }, 100);
     } catch (error) {
       logger.error("Login error:", error);
-      Alert.alert(
-        "Erreur",
-        MESSAGES.LOGIN_ERROR_GENERIC,
-        [{ text: MESSAGES.OK }]
-      );
+      if (error instanceof ApiError) {
+        Alert.alert("Erreur de connexion", error.message, [{ text: MESSAGES.OK }]);
+      } else if (error instanceof Error && (error.message.includes('Network') || error.message.includes('fetch'))) {
+        Alert.alert(
+          "Erreur de connexion",
+          "Impossible de se connecter au serveur. Vérifiez que vous êtes connecté au WiFi Bonecole.",
+          [{ text: MESSAGES.OK }]
+        );
+      } else {
+        Alert.alert("Erreur", "Une erreur s'est produite. Veuillez réessayer.", [{ text: MESSAGES.OK }]);
+      }
       setIsNavigating(false);
     } finally {
       setLoading(false);

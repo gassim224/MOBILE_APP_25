@@ -1,0 +1,689 @@
+/**
+ * API Service Layer
+ * Handles all HTTP requests to the Raspberry Pi backend
+ */
+
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { STORAGE_KEYS } from '@/constants/AppConstants';
+import logger from '@/utils/Logger';
+
+// API Configuration - Hardcoded for production builds
+// Note: Expo env variables are embedded at build time, but we hardcode for reliability
+const API_BASE_URL = 'http://10.42.0.1:8001/user';
+const CLOUD_BASE_URL = 'http://10.42.0.1:8001/cloud';
+
+// API Response Types
+// Actual Login API response format
+export interface LoginApiResponse {
+  status: boolean;
+  message: string;
+  token?: string;
+  data?: {
+    StId: string;
+    fullName: string;
+    StudentEmail: string;
+    SchoolId: string;
+    StudentStatus: boolean;
+    Grade: string;
+    StudentId: string;
+    SchoolName: string;
+  };
+}
+
+export interface LoginResponse {
+  success: boolean;
+  token?: string;
+  user?: {
+    id: string;
+    fullName: string;
+    email: string;
+    studentStatus: boolean;
+    grade: string;
+    studentId: string;
+    schoolName: string;
+    schoolId: string;
+  };
+  message?: string;
+}
+
+export interface HomeResponse {
+  success: boolean;
+  data?: {
+    studentName: string;
+    grade: string;
+    school: string;
+    recentCourses?: ApiCourse[];
+    announcements?: string[];
+  };
+  message?: string;
+}
+
+export interface ApiSubject {
+  id: string;
+  name: string;
+  description?: string;
+  thumbnail?: string;
+  grade?: string;
+}
+
+// Actual API response format for subjects
+export interface SubjectsApiResponse {
+  status: boolean;
+  message: string;
+  data: {
+    Section: string;
+    Grade: string;
+    Subjects: string[];
+  };
+}
+
+export interface SubjectsResponse {
+  success: boolean;
+  subjects?: ApiSubject[];
+  section?: string;
+  grade?: string;
+  message?: string;
+}
+
+// Raw video item from API (within chapters)
+export interface ApiVideoRaw {
+  name: string;
+  path: string;
+  duration?: number; // in seconds
+}
+
+// Videos API response - grouped by chapters
+export interface SubjectVideosApiResponse {
+  status: boolean;
+  message: string;
+  data: {
+    [chapter: string]: ApiVideoRaw[];
+  };
+}
+
+export interface ApiVideo {
+  id: string;
+  title: string;
+  filename: string;
+  duration?: string;
+  durationSeconds?: number;
+  chapter?: string;
+}
+
+export interface SubjectVideosResponse {
+  success: boolean;
+  videos?: ApiVideo[];
+  message?: string;
+}
+
+// Raw PDF item from API
+export interface ApiPdfRaw {
+  name: string;
+  path: string;
+}
+
+// PDFs API response
+export interface SubjectPdfsApiResponse {
+  status: boolean;
+  message: string;
+  data: ApiPdfRaw[];
+}
+
+export interface ApiPdf {
+  id: string;
+  title: string;
+  filename: string;
+}
+
+export interface SubjectPdfsResponse {
+  success: boolean;
+  pdfs?: ApiPdf[];
+  message?: string;
+}
+
+// Past Papers API response
+export interface SubjectPastPapersApiResponse {
+  status: boolean;
+  message: string;
+  data: ApiPdfRaw[];
+}
+
+export interface ApiPastPaper {
+  id: string;
+  title: string;
+  filename: string;
+}
+
+export interface SubjectPastPapersResponse {
+  success: boolean;
+  pastPapers?: ApiPastPaper[];
+  message?: string;
+}
+
+// Raw book item from API
+export interface ApiBookRaw {
+  name: string;
+  author: string;
+  path: string;
+}
+
+// Library API response
+export interface LibraryApiResponse {
+  status: boolean;
+  message: string;
+  data: {
+    totalBooks: number;
+    page: number;
+    totalPages: number;
+    books: ApiBookRaw[];
+  };
+}
+
+export interface ApiBook {
+  id: string;
+  title: string;
+  author: string;
+  filename: string;
+}
+
+export interface LibraryResponse {
+  success: boolean;
+  books?: ApiBook[];
+  totalBooks?: number;
+  totalPages?: number;
+  currentPage?: number;
+  message?: string;
+}
+
+export interface ApiCourse {
+  id: string;
+  name: string;
+  description?: string;
+  thumbnail?: string;
+  grade?: string;
+}
+
+// Error class for API errors
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public statusCode?: number,
+    public responseData?: unknown
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
+// Helper to get auth token
+async function getAuthToken(): Promise<string | null> {
+  try {
+    return await AsyncStorage.getItem(STORAGE_KEYS.SESSION_TOKEN);
+  } catch (error) {
+    logger.error('Error getting auth token:', error);
+    return null;
+  }
+}
+
+// Helper to make authenticated requests
+async function makeRequest<T>(
+  endpoint: string,
+  options: RequestInit = {},
+  requiresAuth: boolean = true
+): Promise<T> {
+  const url = `${API_BASE_URL}${endpoint}`;
+  
+  const headers: HeadersInit = {
+    'Content-Type': 'application/x-www-form-urlencoded',
+    ...options.headers,
+  };
+
+  if (requiresAuth) {
+    const token = await getAuthToken();
+    if (token) {
+      (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`;
+    }
+  }
+
+  try {
+    logger.info(`API Request: ${options.method || 'GET'} ${url}`);
+    
+    const response = await fetch(url, {
+      ...options,
+      headers,
+    });
+
+    // Handle non-JSON responses (like file downloads)
+    const contentType = response.headers.get('content-type');
+    if (contentType && !contentType.includes('application/json')) {
+      if (!response.ok) {
+        throw new ApiError(`HTTP error ${response.status}`, response.status);
+      }
+      return response as unknown as T;
+    }
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new ApiError(
+        data.message || `HTTP error ${response.status}`,
+        response.status,
+        data
+      );
+    }
+
+    logger.info(`API Response: ${response.status}`);
+    return data as T;
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    
+    logger.error('API Request failed:', error);
+    throw new ApiError(
+      error instanceof Error ? error.message : 'Network request failed'
+    );
+  }
+}
+
+// Auth API
+export const AuthAPI = {
+  /**
+   * Login with email and password
+   * @param email User email
+   * @param password User password
+   * @param duration Session duration in minutes
+   */
+  async login(email: string, password: string, duration: number = 51): Promise<LoginResponse> {
+    const body = new URLSearchParams({
+      email,
+      password,
+      duration: duration.toString(),
+    }).toString();
+
+    const url = `${API_BASE_URL}/auth/login`;
+    
+    try {
+      logger.info(`Login attempt for: ${email} to URL: ${url}`);
+      
+      // Use XMLHttpRequest for better Android local network compatibility
+      const response = await new Promise<Response>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', url, true);
+        xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+        xhr.setRequestHeader('Accept', 'application/json');
+        xhr.timeout = 30000; // 30 second timeout
+        
+        xhr.onload = () => {
+          const responseData = xhr.responseText;
+          resolve(new Response(responseData, {
+            status: xhr.status,
+            statusText: xhr.statusText,
+            headers: { 'Content-Type': 'application/json' }
+          }));
+        };
+        
+        xhr.onerror = () => {
+          reject(new Error('Network request failed'));
+        };
+        
+        xhr.ontimeout = () => {
+          reject(new Error('Request timeout'));
+        };
+        
+        xhr.send(body);
+      });
+
+      // Check if response is OK first
+      if (!response.ok) {
+        // Try to get error message from response
+        try {
+          const errorData = await response.json();
+          logger.info('Login failed response:', JSON.stringify(errorData));
+          
+          // Return user-friendly error for wrong credentials
+          if (response.status === 401 || response.status === 400) {
+            return {
+              success: false,
+              message: errorData.message || "Identifiant ou mot de passe incorrect",
+            };
+          }
+          
+          return {
+            success: false,
+            message: errorData.message || `Erreur serveur (${response.status})`,
+          };
+        } catch {
+          return {
+            success: false,
+            message: `Erreur serveur (${response.status})`,
+          };
+        }
+      }
+
+      const data: LoginApiResponse = await response.json();
+      logger.info('Login API raw response:', JSON.stringify(data));
+
+      // API returns { status: true, message, token, data: {...} }
+      if (data.status && data.token) {
+        // Store token
+        await AsyncStorage.setItem(STORAGE_KEYS.SESSION_TOKEN, data.token);
+        logger.info('Token stored successfully');
+
+        // Transform user data to our format
+        const user: LoginResponse['user'] = data.data ? {
+          id: data.data.StId,
+          fullName: data.data.fullName,
+          email: data.data.StudentEmail,
+          studentStatus: data.data.StudentStatus,
+          grade: data.data.Grade,
+          studentId: data.data.StudentId,
+          schoolName: data.data.SchoolName,
+          schoolId: data.data.SchoolId,
+        } : undefined;
+
+        return {
+          success: true,
+          token: data.token,
+          user,
+          message: data.message,
+        };
+      }
+
+      // Login failed - wrong credentials or other issue
+      return {
+        success: false,
+        message: data.message || "Identifiant ou mot de passe incorrect",
+      };
+    } catch (error) {
+      logger.error('Login API error:', error);
+      
+      // Handle specific error types
+      if (error instanceof Error) {
+        if (error.message === 'Request timeout' || error.name === 'AbortError') {
+          throw new ApiError('La connexion a expiré. Vérifiez votre connexion WiFi Bonecole.');
+        }
+        if (error.message.includes('Network request failed') || error.message.includes('Failed to fetch')) {
+          throw new ApiError('Impossible de se connecter au serveur. Vérifiez que vous êtes connecté au WiFi Bonecole.');
+        }
+        if (error.message.includes('timeout')) {
+          throw new ApiError('La connexion a expiré. Le serveur ne répond pas.');
+        }
+      }
+      
+      throw new ApiError(
+        error instanceof Error ? error.message : 'Erreur de connexion'
+      );
+    }
+  },
+
+  /**
+   * Logout and clear session
+   */
+  async logout(): Promise<void> {
+    await AsyncStorage.removeItem(STORAGE_KEYS.SESSION_TOKEN);
+    await AsyncStorage.removeItem(STORAGE_KEYS.USER_PROFILE);
+  },
+};
+
+// Student API
+export const StudentAPI = {
+  /**
+   * Get home screen data
+   */
+  async getHome(): Promise<HomeResponse> {
+    return makeRequest<HomeResponse>('/student/home');
+  },
+
+  /**
+   * Get all subjects for the student's class
+   */
+  async getSubjects(): Promise<SubjectsResponse> {
+    const rawResponse = await makeRequest<SubjectsApiResponse>('/student/subjects');
+    
+    logger.info('Subjects API raw response:', JSON.stringify(rawResponse));
+    
+    // Transform the actual API response to our expected format
+    if (rawResponse.status && rawResponse.data?.Subjects) {
+      const subjects: ApiSubject[] = rawResponse.data.Subjects.map((subjectName, index) => ({
+        id: `subject_${index}_${subjectName.toLowerCase().replace(/\s+/g, '_')}`,
+        name: subjectName,
+        description: '',
+        grade: rawResponse.data.Grade,
+      }));
+      
+      return {
+        success: true,
+        subjects,
+        section: rawResponse.data.Section,
+        grade: rawResponse.data.Grade,
+        message: rawResponse.message,
+      };
+    }
+    
+    return {
+      success: false,
+      message: rawResponse.message || 'Failed to fetch subjects',
+    };
+  },
+
+  /**
+   * Get videos for a specific subject
+   * @param subjectName Name of the subject (e.g., "Français")
+   */
+  async getSubjectVideos(subjectName: string): Promise<SubjectVideosResponse> {
+    const encodedSubject = encodeURIComponent(subjectName);
+    const rawResponse = await makeRequest<SubjectVideosApiResponse>(`/student/subject-videos/${encodedSubject}`);
+    
+    logger.info('Videos API raw response:', JSON.stringify(rawResponse));
+    
+    if (rawResponse.status && rawResponse.data) {
+      // Flatten the chapter-grouped videos into a single array
+      const videos: ApiVideo[] = [];
+      let videoIndex = 0;
+      
+      for (const [chapter, chapterVideos] of Object.entries(rawResponse.data)) {
+        if (Array.isArray(chapterVideos)) {
+          for (const video of chapterVideos) {
+            // Convert duration from seconds to readable format
+            let durationStr: string | undefined;
+            if (video.duration) {
+              const minutes = Math.floor(video.duration / 60);
+              const seconds = video.duration % 60;
+              durationStr = seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes} min`;
+            }
+            
+            videos.push({
+              id: `video_${videoIndex++}`,
+              title: video.name,
+              filename: video.path,
+              duration: durationStr,
+              durationSeconds: video.duration,
+              chapter,
+            });
+          }
+        }
+      }
+      
+      return {
+        success: true,
+        videos,
+        message: rawResponse.message,
+      };
+    }
+    
+    return {
+      success: false,
+      message: rawResponse.message || 'Failed to fetch videos',
+    };
+  },
+
+  /**
+   * Get PDFs for a specific subject
+   * @param subjectName Name of the subject (e.g., "Français")
+   */
+  async getSubjectPdfs(subjectName: string): Promise<SubjectPdfsResponse> {
+    const encodedSubject = encodeURIComponent(subjectName);
+    const rawResponse = await makeRequest<SubjectPdfsApiResponse>(`/student/subject-pdf/${encodedSubject}`);
+    
+    logger.info('PDFs API raw response:', JSON.stringify(rawResponse));
+    
+    if (rawResponse.status && rawResponse.data) {
+      const pdfs: ApiPdf[] = rawResponse.data.map((pdf, index) => ({
+        id: `pdf_${index}`,
+        title: pdf.name,
+        filename: pdf.path,
+      }));
+      
+      return {
+        success: true,
+        pdfs,
+        message: rawResponse.message,
+      };
+    }
+    
+    return {
+      success: false,
+      message: rawResponse.message || 'Failed to fetch PDFs',
+    };
+  },
+
+  /**
+   * Get past papers for a specific subject
+   * @param subjectName Name of the subject (e.g., "Français")
+   */
+  async getSubjectPastPapers(subjectName: string): Promise<SubjectPastPapersResponse> {
+    const encodedSubject = encodeURIComponent(subjectName);
+    const rawResponse = await makeRequest<SubjectPastPapersApiResponse>(`/student/subject-pastPaper/${encodedSubject}`);
+    
+    logger.info('Past Papers API raw response:', JSON.stringify(rawResponse));
+    
+    if (rawResponse.status && rawResponse.data) {
+      const pastPapers: ApiPastPaper[] = rawResponse.data.map((paper, index) => ({
+        id: `paper_${index}`,
+        title: paper.name,
+        filename: paper.path,
+      }));
+      
+      return {
+        success: true,
+        pastPapers,
+        message: rawResponse.message,
+      };
+    }
+    
+    return {
+      success: false,
+      message: rawResponse.message || 'Failed to fetch past papers',
+    };
+  },
+
+  /**
+   * Get library books
+   * @param search Optional search query
+   * @param page Optional page number for pagination
+   */
+  async getLibraryBooks(search?: string, page?: number): Promise<LibraryResponse> {
+    const params = new URLSearchParams();
+    if (search) params.append('search', search);
+    if (page) params.append('page', page.toString());
+    
+    const queryString = params.toString();
+    const endpoint = `/student/library${queryString ? `?${queryString}` : ''}`;
+    
+    const rawResponse = await makeRequest<LibraryApiResponse>(endpoint);
+    
+    logger.info('Library API raw response:', JSON.stringify(rawResponse));
+    
+    if (rawResponse.status && rawResponse.data) {
+      const books: ApiBook[] = rawResponse.data.books.map((book, index) => ({
+        id: `book_${index}`,
+        title: book.name,
+        author: book.author,
+        filename: book.path,
+      }));
+      
+      return {
+        success: true,
+        books,
+        totalBooks: rawResponse.data.totalBooks,
+        totalPages: rawResponse.data.totalPages,
+        currentPage: rawResponse.data.page,
+        message: rawResponse.message,
+      };
+    }
+    
+    return {
+      success: false,
+      message: rawResponse.message || 'Failed to fetch books',
+    };
+  },
+};
+
+// Download API
+export const DownloadAPI = {
+  /**
+   * Get video download URL
+   * @param subjectFolder Subject folder name
+   * @param filename Video filename
+   */
+  getVideoUrl(subjectFolder: string, filename: string): string {
+    const encodedFolder = encodeURIComponent(subjectFolder);
+    const encodedFilename = encodeURIComponent(filename);
+    return `${API_BASE_URL}/student/download-video/${encodedFolder}/${encodedFilename}`;
+  },
+
+  /**
+   * Get PDF download URL
+   * @param subjectFolder Subject folder name
+   * @param filename PDF filename
+   */
+  getPdfUrl(subjectFolder: string, filename: string): string {
+    const encodedFolder = encodeURIComponent(subjectFolder);
+    const encodedFilename = encodeURIComponent(filename);
+    return `${API_BASE_URL}/student/download-pdf/${encodedFolder}/${encodedFilename}`;
+  },
+
+  /**
+   * Get library book download URL
+   * @param filename Book filename
+   */
+  getBookUrl(filename: string): string {
+    const encodedFilename = encodeURIComponent(filename);
+    return `${API_BASE_URL}/student/download-libraryBook/${encodedFilename}`;
+  },
+
+  /**
+   * Download a file with authentication
+   * @param url Full URL to download
+   */
+  async downloadFile(url: string): Promise<Response> {
+    const token = await getAuthToken();
+    
+    const headers: HeadersInit = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(url, { headers });
+    
+    if (!response.ok) {
+      throw new ApiError(`Download failed: ${response.status}`, response.status);
+    }
+
+    return response;
+  },
+};
+
+// Export base URLs for direct use if needed
+export const API_URLS = {
+  BASE: API_BASE_URL,
+  CLOUD: CLOUD_BASE_URL,
+};
+
+export default {
+  Auth: AuthAPI,
+  Student: StudentAPI,
+  Download: DownloadAPI,
+  URLS: API_URLS,
+};

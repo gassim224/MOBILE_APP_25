@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -14,100 +15,15 @@ import { useConnectionSimulator } from "@/contexts/ConnectionSimulatorContext";
 import { useDownloads } from "@/contexts/DownloadsContext";
 import { Lesson } from "@/types";
 import { MESSAGES } from "@/constants/AppConstants";
-import { SAMPLE_PDF_URL, SAMPLE_VIDEO_URL, SAMPLE_AUDIO_URL } from "@/constants/SampleData";
 import { downloadFile, generateFileName } from "@/utils/fileDownloader";
 import logger from "@/utils/Logger";
 import { AcademicBadge } from "@/components/AcademicBadge";
-
-// Mock lessons data for a course
-const MOCK_LESSONS: Lesson[] = [
-  {
-    id: "l1",
-    title: "Introduction à l'algèbre",
-    type: "video",
-    size: "45 MB",
-    duration: "15 min",
-    isDownloaded: false,
-  },
-  {
-    id: "l2",
-    title: "Équations linéaires - Théorie",
-    type: "pdf",
-    size: "2.3 MB",
-    isDownloaded: false,
-  },
-  {
-    id: "l3",
-    title: "Équations linéaires - Pratique",
-    type: "video",
-    size: "52 MB",
-    duration: "20 min",
-    isDownloaded: false,
-  },
-  {
-    id: "l4",
-    title: "Systèmes d'équations",
-    type: "video",
-    size: "68 MB",
-    duration: "25 min",
-    isDownloaded: false,
-  },
-  {
-    id: "l5",
-    title: "Exercices - Systèmes d'équations",
-    type: "pdf",
-    size: "1.8 MB",
-    isDownloaded: false,
-  },
-  {
-    id: "l6",
-    title: "Fonctions quadratiques",
-    type: "video",
-    size: "75 MB",
-    duration: "30 min",
-    isDownloaded: false,
-  },
-  {
-    id: "l7",
-    title: "Résolution de problèmes",
-    type: "audio",
-    size: "12 MB",
-    duration: "18 min",
-    isDownloaded: false,
-  },
-  {
-    id: "l8",
-    title: "Résumé du cours",
-    type: "pdf",
-    size: "3.5 MB",
-    isDownloaded: false,
-  },
-  {
-    id: "l9",
-    title: "Guide de révision",
-    type: "pdf",
-    size: "4.2 MB",
-    isDownloaded: false,
-  },
-  {
-    id: "l10",
-    title: "Exercices de pratique - Niveau 1",
-    type: "pdf",
-    size: "2.1 MB",
-    isDownloaded: false,
-  },
-  {
-    id: "l11",
-    title: "Exercices de pratique - Niveau 2",
-    type: "pdf",
-    size: "2.5 MB",
-    isDownloaded: false,
-  },
-];
+import { StudentAPI, DownloadAPI, ApiVideo, ApiPdf, ApiPastPaper } from "@/services/api";
+import { getDownloadedCourses } from "@/services/downloadService";
 
 type TabType = 'lessons' | 'texts' | 'exercises';
 
-// Categorize lessons based on type and title
+// Categorize lessons based on type and ID prefix
 const categorizeLessons = (lessons: Lesson[]) => {
   const categorized = {
     lessons: [] as Lesson[],
@@ -116,8 +32,10 @@ const categorizeLessons = (lessons: Lesson[]) => {
   };
 
   lessons.forEach((lesson) => {
-    // Check if it's an exercise based on title
-    const isExercise = lesson.title.toLowerCase().includes('exercice');
+    const isExercise = lesson.id.startsWith('exercise_') ||
+                       lesson.title.toLowerCase().includes('exercice') ||
+                       lesson.title.toLowerCase().includes('annale') ||
+                       lesson.title.toLowerCase().includes('corrigé');
 
     if (lesson.type === 'video' || lesson.type === 'audio') {
       categorized.lessons.push(lesson);
@@ -133,37 +51,118 @@ const categorizeLessons = (lessons: Lesson[]) => {
   return categorized;
 };
 
+// Map API data to Lesson types
+const mapVideoToLesson = (video: ApiVideo, subjectName: string): Lesson => {
+  const isAudio = video.filename.toLowerCase().endsWith('.mp3') ||
+                  video.filename.toLowerCase().endsWith('.wav') ||
+                  video.filename.toLowerCase().endsWith('.m4a');
+  return {
+    id: `video_${video.id}`,
+    title: video.title,
+    type: isAudio ? 'audio' : 'video',
+    size: 'N/A',
+    duration: video.duration,
+    isDownloaded: false,
+    mediaUrl: DownloadAPI.getVideoUrl(subjectName, video.filename),
+  };
+};
+
+const mapPdfToLesson = (pdf: ApiPdf, subjectName: string): Lesson => ({
+  id: `pdf_${pdf.id}`,
+  title: pdf.title,
+  type: 'pdf',
+  size: 'N/A',
+  isDownloaded: false,
+  mediaUrl: DownloadAPI.getPdfUrl(subjectName, pdf.filename),
+});
+
+const mapPastPaperToLesson = (paper: ApiPastPaper, subjectName: string): Lesson => ({
+  id: `exercise_${paper.id}`,
+  title: paper.title,
+  type: 'pdf',
+  size: 'N/A',
+  isDownloaded: false,
+  mediaUrl: DownloadAPI.getPdfUrl(subjectName, paper.filename),
+});
+
 export default function CourseDetail() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const { isConnectedToKiosk } = useConnectionSimulator();
   const { addDownloadedCourse, downloadedCourses } = useDownloads();
 
-  const [lessons, setLessons] = useState<Lesson[]>(MOCK_LESSONS);
+  const [lessons, setLessons] = useState<Lesson[]>([]);
   const [downloadingLessonId, setDownloadingLessonId] = useState<string | null>(null);
   const [downloadingAll, setDownloadingAll] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('lessons');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Validate and extract navigation params with proper typing
   const courseTitle = (params.title as string | undefined) || "Cours";
   const courseDescription = (params.description as string | undefined) || "";
   const courseId = (params.id as string | undefined) || "unknown";
 
-  // Validate required params on mount
-  useEffect(() => {
-    if (!params.title) {
-      Alert.alert(
-        "Erreur",
-        "Les informations du cours sont manquantes.",
-        [
-          {
-            text: MESSAGES.OK,
-            onPress: () => router.back(),
-          },
-        ]
-      );
+  // Load downloaded course content for offline mode
+  const loadDownloadedCourseContent = useCallback(async () => {
+    try {
+      const downloadedCoursesList = await getDownloadedCourses();
+      const downloadedCourse = downloadedCoursesList.find(c => c.id === courseId || c.title === courseTitle);
+      if (downloadedCourse && downloadedCourse.lessons.length > 0) {
+        setLessons(downloadedCourse.lessons.map(lesson => ({ ...lesson, isDownloaded: true })));
+        setError(null);
+      } else {
+        setLessons([]);
+        setError("Ce cours n'a pas été téléchargé");
+      }
+    } catch (err) {
+      logger.error("Error loading downloaded course:", err);
+      setLessons([]);
+      setError("Erreur lors du chargement du cours téléchargé");
     }
-  }, [params.title, router]);
+  }, [courseId, courseTitle]);
+
+  // Fetch course content from API or load downloaded content
+  useEffect(() => {
+    const fetchCourseContent = async () => {
+      if (!params.title) {
+        Alert.alert("Erreur", "Les informations du cours sont manquantes.", [{ text: MESSAGES.OK, onPress: () => router.back() }]);
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
+
+      if (!isConnectedToKiosk) {
+        await loadDownloadedCourseContent();
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const [videosResponse, pdfsResponse, pastPapersResponse] = await Promise.all([
+          StudentAPI.getSubjectVideos(courseTitle).catch(err => { logger.warn("Failed to fetch videos:", err); return { success: false, videos: [] }; }),
+          StudentAPI.getSubjectPdfs(courseTitle).catch(err => { logger.warn("Failed to fetch PDFs:", err); return { success: false, pdfs: [] }; }),
+          StudentAPI.getSubjectPastPapers(courseTitle).catch(err => { logger.warn("Failed to fetch past papers:", err); return { success: false, pastPapers: [] }; }),
+        ]);
+
+        const allLessons: Lesson[] = [];
+        if (videosResponse.success && videosResponse.videos) allLessons.push(...videosResponse.videos.map(v => mapVideoToLesson(v, courseTitle)));
+        if (pdfsResponse.success && pdfsResponse.pdfs) allLessons.push(...pdfsResponse.pdfs.map(p => mapPdfToLesson(p, courseTitle)));
+        if (pastPapersResponse.success && pastPapersResponse.pastPapers) allLessons.push(...pastPapersResponse.pastPapers.map(p => mapPastPaperToLesson(p, courseTitle)));
+
+        setLessons(allLessons);
+      } catch (err) {
+        logger.error("Failed to fetch course content:", err);
+        setError("Impossible de charger le contenu du cours. Vérifiez votre connexion.");
+        setLessons([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCourseContent();
+  }, [params.title, courseTitle, courseId, router, isConnectedToKiosk, loadDownloadedCourseContent]);
 
   // Categorize lessons
   const categorizedLessons = categorizeLessons(lessons);
@@ -190,17 +189,16 @@ export default function CourseDetail() {
     if (downloadedCourse) {
       setLessons(prev => prev.map(lesson => {
         const downloadedLesson = downloadedCourse.lessons.find(l => l.id === lesson.id);
-        if (downloadedLesson) {
-          return { ...lesson, isDownloaded: true };
-        }
-        return lesson;
+        return downloadedLesson ? { ...lesson, isDownloaded: true } : lesson;
       }));
     }
   }, [downloadedCourses, courseId]);
 
   const totalSize = lessons.reduce((sum, lesson) => {
-    const size = parseFloat(lesson.size);
-    return sum + size;
+    const match = lesson.size.match(/(\d+(?:\.\d+)?)\s*(MB|GB)/i);
+    if (!match) return sum;
+    const value = parseFloat(match[1]);
+    return sum + (match[2].toUpperCase() === 'GB' ? value * 1024 : value);
   }, 0);
 
   const downloadedCount = lessons.filter((l) => l.isDownloaded).length;
@@ -216,19 +214,6 @@ export default function CourseDetail() {
         return "headset";
       default:
         return "document";
-    }
-  };
-
-  const getMediaUrlForType = (type: Lesson["type"]): string => {
-    switch (type) {
-      case "video":
-        return SAMPLE_VIDEO_URL;
-      case "pdf":
-        return SAMPLE_PDF_URL;
-      case "audio":
-        return SAMPLE_AUDIO_URL;
-      default:
-        return "";
     }
   };
 
@@ -251,8 +236,8 @@ export default function CourseDetail() {
         throw new Error('Lesson not found');
       }
 
-      // Get the remote URL for this lesson type
-      const remoteUrl = getMediaUrlForType(lesson.type);
+      // Get the remote URL for this lesson
+      const remoteUrl = lesson.mediaUrl || '';
 
       // Generate filename
       const fileName = generateFileName(lessonId, lesson.title, lesson.type);
@@ -365,8 +350,8 @@ export default function CourseDetail() {
               const lessonsWithLocalFiles = await Promise.all(
                 lessons.map(async (lesson) => {
                   try {
-                    // Get remote URL for this lesson type
-                    const remoteUrl = getMediaUrlForType(lesson.type);
+                    // Get remote URL for this lesson
+                    const remoteUrl = lesson.mediaUrl || '';
 
                     // Generate filename
                     const fileName = generateFileName(lesson.id, lesson.title, lesson.type);
@@ -580,15 +565,12 @@ export default function CourseDetail() {
           </View>
 
           <Text style={styles.courseTitle}>{courseTitle}</Text>
-          {courseDescription && (
-            <Text style={styles.courseDescription}>{courseDescription}</Text>
-          )}
 
           <View style={styles.courseStats}>
             <View style={styles.statItem}>
               <Ionicons name="list" size={16} color="#FFD700" />
               <Text style={styles.statText}>
-                {downloadedCount}/{totalCount} leçons
+                {downloadedCount}/{totalCount}
               </Text>
             </View>
             <View style={styles.statItem}>
@@ -649,17 +631,29 @@ export default function CourseDetail() {
         {renderTabs()}
 
         {/* Content List */}
-        <ScrollView
-          style={styles.content}
-          contentContainerStyle={styles.contentContainer}
-          showsVerticalScrollIndicator={false}
-        >
-          {activeCategoryLessons.length > 0 ? (
-            activeCategoryLessons.map(renderLesson)
-          ) : (
-            renderEmptyState()
-          )}
-        </ScrollView>
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#1E3A5F" />
+            <Text style={styles.loadingText}>Chargement du contenu...</Text>
+          </View>
+        ) : error && lessons.length === 0 ? (
+          <View style={styles.errorContainer}>
+            <Ionicons name="alert-circle-outline" size={64} color="#DC3545" />
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        ) : (
+          <ScrollView
+            style={styles.content}
+            contentContainerStyle={styles.contentContainer}
+            showsVerticalScrollIndicator={false}
+          >
+            {activeCategoryLessons.length > 0 ? (
+              activeCategoryLessons.map(renderLesson)
+            ) : (
+              renderEmptyState()
+            )}
+          </ScrollView>
+        )}
       </View>
     </>
   );
@@ -909,6 +903,30 @@ const styles = StyleSheet.create({
   },
   tabBadgeTextActive: {
     color: "#FFFFFF",
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  loadingText: {
+    fontSize: 16,
+    color: "#5A5A5A",
+    marginTop: 16,
+    fontWeight: "500",
+  },
+  errorContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 32,
+  },
+  errorText: {
+    fontSize: 16,
+    color: "#DC3545",
+    marginTop: 16,
+    textAlign: "center",
+    fontWeight: "500",
   },
   emptyState: {
     flex: 1,

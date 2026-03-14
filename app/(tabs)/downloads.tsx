@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -12,7 +12,7 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import * as FileSystem from "expo-file-system/legacy";
-import { SAMPLE_PDF_URL } from "@/constants/SampleData";
+import * as FileSystemNew from "expo-file-system";
 import { sendCourseCompletionNotification } from "@/utils/notificationService";
 import { useDownloads } from "@/contexts/DownloadsContext";
 import logger from "@/utils/Logger";
@@ -139,8 +139,47 @@ export default function Downloads() {
 
   const totalDownloads = downloadedCourses.length + downloadedBooks.length;
 
-  // Calculate storage status
-  const storageStatus = getStorageStatus(downloadedCourses, downloadedBooks);
+  // Real device storage state
+  const [deviceFreeMB, setDeviceFreeMB] = useState<number | null>(null);
+  const [deviceTotalMB, setDeviceTotalMB] = useState<number | null>(null);
+
+  const fetchDeviceStorage = useCallback(async () => {
+    try {
+      const [free, total] = await Promise.all([
+        FileSystemNew.getFreeDiskStorageAsync(),
+        FileSystemNew.getTotalDiskCapacityAsync(),
+      ]);
+      setDeviceFreeMB(free / (1024 * 1024));
+      setDeviceTotalMB(total / (1024 * 1024));
+    } catch {
+      // Fall back to mock values on error
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchDeviceStorage();
+  }, [fetchDeviceStorage]);
+
+  // Calculate storage status using real device values when available
+  const baseStorageStatus = getStorageStatus(downloadedCourses, downloadedBooks);
+  const storageStatus = deviceTotalMB !== null && deviceFreeMB !== null
+    ? {
+        ...baseStorageStatus,
+        totalFormatted: deviceTotalMB >= 1024
+          ? `${(deviceTotalMB / 1024).toFixed(1)} Go`
+          : `${Math.round(deviceTotalMB)} Mo`,
+        freeFormatted: deviceFreeMB >= 1024
+          ? `${(deviceFreeMB / 1024).toFixed(1)} Go`
+          : `${Math.round(deviceFreeMB)} Mo`,
+        usagePercentage: Math.min(((deviceTotalMB - deviceFreeMB) / deviceTotalMB) * 100, 100),
+        usedFormatted: (() => {
+          const usedMB = deviceTotalMB - deviceFreeMB;
+          return usedMB >= 1024
+            ? `${(usedMB / 1024).toFixed(1)} Go`
+            : `${Math.round(usedMB)} Mo`;
+        })(),
+      }
+    : baseStorageStatus;
 
   // Handle incoming tab parameter from navigation
   useEffect(() => {
@@ -254,9 +293,9 @@ export default function Downloads() {
       <TouchableOpacity
         style={styles.browseButton}
         activeOpacity={0.8}
-        onPress={() => router.push("/(tabs)")}
+        onPress={() => router.push("/(tabs)/cours")}
       >
-        <Ionicons name="home" size={20} color="#1E3A5F" />
+        <Ionicons name="school-outline" size={20} color="#1E3A5F" />
         <Text style={styles.browseButtonText}>Découvrir les cours</Text>
       </TouchableOpacity>
     </View>

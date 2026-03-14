@@ -7,8 +7,9 @@ import {
   TouchableOpacity,
   Dimensions,
   Modal,
+  ActivityIndicator,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
@@ -18,6 +19,8 @@ import { progressStorage } from "@/utils/progressStorage";
 import logger from "@/utils/Logger";
 import { UserProfile, Course, Book } from "@/types";
 import { AcademicBadge } from "@/components/AcademicBadge";
+import { StudentAPI, ApiSubject, ApiBook } from "@/services/api";
+import { getDownloadedCourses, getDownloadedBooks } from "@/services/downloadService";
 
 interface RecentActivity {
   id: string;
@@ -32,112 +35,36 @@ interface RecentActivity {
 const { width } = Dimensions.get("window");
 const CARD_WIDTH = width * 0.38; // Unified card width for both courses and books
 
-// Mock data - courses with grade levels
-const MOCK_COURSES: Course[] = [
-  {
-    id: "1",
-    title: "Mathématiques",
-    description: "Algèbre et Géométrie",
-    thumbnail: "📐",
-    gradeLevel: "10ème Année",
-  },
-  {
-    id: "2",
-    title: "Physique",
-    description: "Mécanique et Électricité",
-    thumbnail: "⚛️",
-    gradeLevel: "10ème Année",
-  },
-  {
-    id: "3",
-    title: "Chimie",
-    description: "Chimie Organique",
-    thumbnail: "🧪",
-    gradeLevel: "11ème Année",
-  },
-  {
-    id: "4",
-    title: "Economie",
-    description: "Micro et Macroéconomie",
-    thumbnail: "📈",
-    gradeLevel: "11ème Année",
-  },
-  {
-    id: "5",
-    title: "Philosophie",
-    description: "Pensée et Raisonnement",
-    thumbnail: "🤔",
-    gradeLevel: "12ème Année",
-  },
-  {
-    id: "6",
-    title: "Anglais",
-    description: "Langue et Culture",
-    thumbnail: "🇬🇧",
-    gradeLevel: "10ème Année",
-  },
-  {
-    id: "7",
-    title: "Français",
-    description: "Littérature et Grammaire",
-    thumbnail: "🇫🇷",
-    gradeLevel: "12ème Année",
-  },
-];
+// Subject descriptions mapping
+const SUBJECT_DESCRIPTIONS: Record<string, string> = {
+  "Français": "Littérature et Grammaire",
+  "Anglais": "Langue et Culture",
+  "Histoire": "Histoire du Monde",
+  "Géographie": "Géographie Mondiale",
+  "Économie": "Micro et Macroéconomie",
+  "Philosophie": "Pensée et Raisonnement",
+  "Mathématiques": "Algèbre et Géométrie",
+  "Physique": "Mécanique et Électricité",
+  "Chimie": "Chimie Organique",
+  "Biologie": "Sciences de la Vie",
+};
 
-const MOCK_BOOKS: Book[] = [
-  {
-    id: "b1",
-    title: "Une si longue lettre",
-    author: "Mariama Bâ",
-    description: "Un chef-d'œuvre de la littérature africaine francophone.",
-    thumbnail: "📕",
-  },
-  {
-    id: "b2",
-    title: "L'Enfant noir",
-    author: "Camara Laye",
-    description: "Une autobiographie touchante sur l'enfance en Afrique.",
-    thumbnail: "📗",
-  },
-  {
-    id: "b3",
-    title: "L'alchimiste",
-    author: "Paulo Coelho",
-    description: "Une quête spirituelle et philosophique inoubliable.",
-    thumbnail: "📘",
-  },
-];
+// Convert API data to local types
+const mapSubjectToCourse = (subject: ApiSubject): Course => ({
+  id: subject.id,
+  title: subject.name,
+  description: subject.description || SUBJECT_DESCRIPTIONS[subject.name] || "",
+  thumbnail: subject.thumbnail || "📚",
+  gradeLevel: subject.grade || "",
+});
 
-const MOCK_RECENT_ACTIVITIES: RecentActivity[] = [
-  {
-    id: "r1",
-    type: "course",
-    title: "Mathématiques",
-    subtitle: "Algèbre et Géométrie",
-    thumbnail: "📐",
-    progress: 65,
-    lastAccessed: "Il y a 2 heures",
-  },
-  {
-    id: "r2",
-    type: "book",
-    title: "Une si longue lettre",
-    subtitle: "Mariama Bâ",
-    thumbnail: "📕",
-    progress: 40,
-    lastAccessed: "Hier",
-  },
-  {
-    id: "r3",
-    type: "course",
-    title: "Physique",
-    subtitle: "Mécanique et Électricité",
-    thumbnail: "⚛️",
-    progress: 30,
-    lastAccessed: "Il y a 3 jours",
-  },
-];
+const mapApiBookToBook = (apiBook: ApiBook): Book => ({
+  id: apiBook.id,
+  title: apiBook.title,
+  author: apiBook.author,
+  description: "",
+  thumbnail: "📚",
+});
 
 export default function Home() {
   const router = useRouter();
@@ -146,7 +73,74 @@ export default function Home() {
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
   const [bookModalVisible, setBookModalVisible] = useState(false);
   const [bookProgressMap, setBookProgressMap] = useState<Record<string, number>>({});
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [books, setBooks] = useState<Book[]>([]);
+  const [loadingContent, setLoadingContent] = useState(false);
   const { isConnectedToKiosk } = useConnectionSimulator();
+
+  // Load downloaded content for offline mode
+  const loadDownloadedContent = useCallback(async () => {
+    try {
+      const [dlCourses, dlBooks] = await Promise.all([
+        getDownloadedCourses(),
+        getDownloadedBooks(),
+      ]);
+      setCourses(dlCourses.map(dc => ({
+        id: dc.id,
+        title: dc.title,
+        description: `${dc.lessons.length} leçons téléchargées`,
+        thumbnail: dc.thumbnail,
+        gradeLevel: "",
+      })));
+      setBooks(dlBooks.map(db => ({
+        id: db.id,
+        title: db.title,
+        author: db.author,
+        description: "Téléchargé",
+        thumbnail: db.thumbnail,
+      })));
+    } catch (error) {
+      logger.error("Error loading downloaded content:", error);
+      setCourses([]);
+      setBooks([]);
+    }
+  }, []);
+
+  // Fetch from API when online, load downloads when offline
+  const fetchData = useCallback(async () => {
+    setLoadingContent(true);
+    if (!isConnectedToKiosk) {
+      await loadDownloadedContent();
+      setLoadingContent(false);
+      return;
+    }
+    try {
+      const [subjectsResponse, booksResponse] = await Promise.all([
+        StudentAPI.getSubjects().catch(err => { logger.warn("Failed to fetch subjects:", err); return { success: false, subjects: [] }; }),
+        StudentAPI.getLibraryBooks().catch(err => { logger.warn("Failed to fetch books:", err); return { success: false, books: [] }; }),
+      ]);
+      setCourses(subjectsResponse.success && subjectsResponse.subjects ? subjectsResponse.subjects.map(mapSubjectToCourse) : []);
+      setBooks(booksResponse.success && booksResponse.books ? booksResponse.books.map(mapApiBookToBook) : []);
+    } catch (error) {
+      logger.error("Error fetching home data:", error);
+      setCourses([]);
+      setBooks([]);
+    } finally {
+      setLoadingContent(false);
+    }
+  }, [isConnectedToKiosk, loadDownloadedContent]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!isConnectedToKiosk) {
+        loadDownloadedContent();
+      }
+    }, [isConnectedToKiosk, loadDownloadedContent])
+  );
 
   // Load book progress from storage
   useEffect(() => {
@@ -217,9 +211,9 @@ export default function Home() {
   }, [loadUserProfile]);
 
   // Filter courses by user's grade level
-  const filteredCourses = userProfile
-    ? MOCK_COURSES.filter(course => course.gradeLevel === userProfile.grade)
-    : MOCK_COURSES;
+  const filteredCourses = userProfile?.grade
+    ? courses.filter(course => !course.gradeLevel || course.gradeLevel === userProfile.grade)
+    : courses;
 
   const handleCoursePress = (course: Course) => {
     router.push({
@@ -500,7 +494,7 @@ export default function Home() {
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={styles.horizontalScroll}
                 >
-                  {MOCK_BOOKS.map(renderBookCard)}
+                  {books.slice(0, 5).map(renderBookCard)}
                 </ScrollView>
               </View>
             </>

@@ -13,7 +13,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { progressStorage, MediaProgress } from '@/utils/progressStorage';
-import { SAMPLE_PDF_URL } from '@/constants/SampleData';
 import { scheduleLessonContinuationReminder, cancelLessonContinuationReminder } from '@/utils/notificationService';
 
 // Conditionally import react-native-pdf only for native platforms
@@ -90,6 +89,7 @@ export default function PdfReader() {
       const progress: MediaProgress = {
         lessonId: itemId,
         position: page,
+        duration: totalPages > 0 ? totalPages : undefined, // store total pages as duration
         lastUpdated: new Date().toISOString(),
         type: 'pdf',
       };
@@ -145,8 +145,7 @@ export default function PdfReader() {
     setShowHeader(!showHeader);
   };
 
-  // Use the sample PDF URL - always use the same demo PDF for consistency
-  const demoPdfUrl = pdfUrl || SAMPLE_PDF_URL;
+  const demoPdfUrl = pdfUrl || '';
 
   // Web fallback view
   if (Platform.OS === 'web') {

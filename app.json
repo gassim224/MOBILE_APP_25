@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Bonecole_offline_first",
+    "name": "Bonecole",
     "slug": "bonecole-offline-first",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -30,6 +30,7 @@
     },
     "plugins": [
       "expo-router",
+      "expo-screen-orientation",
       [
         "expo-splash-screen",
         {

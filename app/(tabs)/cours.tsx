@@ -1,86 +1,37 @@
-import React, { useCallback } from "react";
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, useWindowDimensions, ListRenderItem } from "react-native";
-import { useRouter } from "expo-router";
+import React, { useCallback, useEffect, useState } from "react";
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, useWindowDimensions, ListRenderItem, ActivityIndicator } from "react-native";
+import { useRouter, useFocusEffect } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import ConnectionStatus from "@/components/ConnectionStatus";
 import { useConnectionSimulator } from "@/contexts/ConnectionSimulatorContext";
 import { Course } from "@/types";
 import { AcademicBadge } from "@/components/AcademicBadge";
+import { StudentAPI, ApiSubject } from "@/services/api";
+import { getDownloadedCourses } from "@/services/downloadService";
+import logger from "@/utils/Logger";
 
-// Mock data - complete course catalog
-const ALL_COURSES: Course[] = [
-  {
-    id: "1",
-    title: "Mathématiques",
-    description: "Algèbre et Géométrie",
-    thumbnail: "📐",
-    gradeLevel: "10ème Année",
-  },
-  {
-    id: "2",
-    title: "Physique",
-    description: "Mécanique et Électricité",
-    thumbnail: "⚛️",
-    gradeLevel: "10ème Année",
-  },
-  {
-    id: "3",
-    title: "Chimie",
-    description: "Chimie Organique",
-    thumbnail: "🧪",
-    gradeLevel: "11ème Année",
-  },
-  {
-    id: "4",
-    title: "Economie",
-    description: "Micro et Macroéconomie",
-    thumbnail: "📈",
-    gradeLevel: "11ème Année",
-  },
-  {
-    id: "5",
-    title: "Philosophie",
-    description: "Pensée et Raisonnement",
-    thumbnail: "🤔",
-    gradeLevel: "12ème Année",
-  },
-  {
-    id: "6",
-    title: "Anglais",
-    description: "Langue et Culture",
-    thumbnail: "🇬🇧",
-    gradeLevel: "10ème Année",
-  },
-  {
-    id: "7",
-    title: "Français",
-    description: "Littérature et Grammaire",
-    thumbnail: "🇫🇷",
-    gradeLevel: "11ème Année",
-  },
-  {
-    id: "8",
-    title: "Histoire",
-    description: "Histoire du Monde",
-    thumbnail: "📜",
-    gradeLevel: "12ème Année",
-  },
-  {
-    id: "9",
-    title: "Géographie",
-    description: "Géographie Mondiale",
-    thumbnail: "🌍",
-    gradeLevel: "11ème Année",
-  },
-  {
-    id: "10",
-    title: "Biologie",
-    description: "Sciences de la Vie",
-    thumbnail: "🧬",
-    gradeLevel: "10ème Année",
-  },
-];
+// Subject descriptions mapping
+const SUBJECT_DESCRIPTIONS: Record<string, string> = {
+  "Français": "Littérature et Grammaire",
+  "Anglais": "Langue et Culture",
+  "Histoire": "Histoire du Monde",
+  "Géographie": "Géographie Mondiale",
+  "Économie": "Micro et Macroéconomie",
+  "Philosophie": "Pensée et Raisonnement",
+  "Mathématiques": "Algèbre et Géométrie",
+  "Physique": "Mécanique et Électricité",
+  "Chimie": "Chimie Organique",
+  "Biologie": "Sciences de la Vie",
+};
+
+const mapSubjectToCourse = (subject: ApiSubject): Course => ({
+  id: subject.id,
+  title: subject.name,
+  description: subject.description || SUBJECT_DESCRIPTIONS[subject.name] || "",
+  thumbnail: subject.thumbnail || "📚",
+  gradeLevel: subject.grade || "",
+});
 
 function Cours() {
   const router = useRouter();
@@ -88,6 +39,61 @@ function Cours() {
   const { width } = useWindowDimensions();
   const numColumns = width >= 768 ? 3 : 2;
   const cardWidth = (width - 64) / numColumns;
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadDownloadedCourses = useCallback(async () => {
+    try {
+      const downloadedCourses = await getDownloadedCourses();
+      setCourses(downloadedCourses.map(dc => ({
+        id: dc.id,
+        title: dc.title,
+        description: `${dc.lessons.length} leçons téléchargées`,
+        thumbnail: dc.thumbnail,
+        gradeLevel: "",
+      })));
+      setError(downloadedCourses.length === 0 ? "Aucun cours téléchargé" : null);
+    } catch (err) {
+      logger.error("Error loading downloaded courses:", err);
+      setCourses([]);
+      setError("Erreur lors du chargement des cours téléchargés");
+    }
+  }, []);
+
+  useEffect(() => {
+    const fetchSubjects = async () => {
+      setLoading(true);
+      setError(null);
+      if (!isConnectedToKiosk) {
+        await loadDownloadedCourses();
+        setLoading(false);
+        return;
+      }
+      try {
+        const response = await StudentAPI.getSubjects();
+        if (response.success && response.subjects) {
+          setCourses(response.subjects.map(mapSubjectToCourse));
+        } else {
+          setCourses([]);
+          setError("Aucun cours disponible");
+        }
+      } catch (err) {
+        logger.error("Failed to fetch subjects:", err);
+        setError("Impossible de charger les cours. Vérifiez votre connexion.");
+        setCourses([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchSubjects();
+  }, [isConnectedToKiosk, loadDownloadedCourses]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!isConnectedToKiosk) loadDownloadedCourses();
+    }, [isConnectedToKiosk, loadDownloadedCourses])
+  );
 
   const handleCoursePress = useCallback((course: Course) => {
     router.push({
@@ -119,9 +125,6 @@ function Cours() {
         <Text style={styles.courseTitle} numberOfLines={2}>
           {course.title}
         </Text>
-        <Text style={styles.courseDescription} numberOfLines={2}>
-          {course.description}
-        </Text>
       </View>
     </TouchableOpacity>
   ), [handleCoursePress, cardWidth]);
@@ -141,28 +144,32 @@ function Cours() {
         </View>
 
         {/* Content */}
-        {!isConnectedToKiosk ? (
-          // Offline state
-          <View style={styles.offlineContainer}>
-            <View style={styles.offlineIcon}>
-              <Ionicons name="cloud-offline-outline" size={80} color="#1E3A5F" />
-            </View>
-            <Text style={styles.offlineTitle}>Hors ligne</Text>
-            <Text style={styles.offlineMessage}>
-              Connectez-vous au Wi-Fi de l&apos;école pour découvrir et télécharger de nouveaux contenus.
-            </Text>
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#1E3A5F" />
+            <Text style={styles.loadingText}>Chargement des cours...</Text>
+          </View>
+        ) : error && courses.length === 0 ? (
+          <View style={styles.errorContainer}>
+            <Ionicons name="alert-circle-outline" size={64} color="#DC3545" />
+            <Text style={styles.errorText}>{error}</Text>
           </View>
         ) : (
-          // Online state - show all courses in grid
           <FlatList
             key={numColumns}
-            data={ALL_COURSES}
+            data={courses}
             renderItem={renderCourseCard}
             keyExtractor={keyExtractor}
             numColumns={numColumns}
             contentContainerStyle={styles.gridContainer}
             columnWrapperStyle={styles.columnWrapper}
             showsVerticalScrollIndicator={false}
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <Ionicons name="folder-open-outline" size={64} color="#A0A0A0" />
+                <Text style={styles.emptyText}>Aucun cours disponible</Text>
+              </View>
+            }
           />
         )}
       </View>
@@ -272,5 +279,42 @@ const styles = StyleSheet.create({
     color: "#5A5A5A",
     textAlign: "center",
     lineHeight: 24,
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 32,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: "#5A5A5A",
+    marginTop: 16,
+    fontWeight: "500",
+  },
+  errorContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 32,
+  },
+  errorText: {
+    fontSize: 16,
+    color: "#DC3545",
+    marginTop: 16,
+    textAlign: "center",
+    fontWeight: "500",
+  },
+  emptyContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 60,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: "#A0A0A0",
+    marginTop: 16,
+    fontWeight: "500",
   },
 });

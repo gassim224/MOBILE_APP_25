@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -12,15 +12,8 @@ import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
-import {
-  testInactivityNotification,
-  testCourseCompletionNotification,
-  testLessonContinuationNotification,
-  testNewContentNotification,
-  testNextSessionNotification,
-  testLowStorageNotification,
-} from "@/utils/notificationService";
 import { useConnectionSimulator } from "@/contexts/ConnectionSimulatorContext";
+import { useDownloads } from "@/contexts/DownloadsContext";
 import logger from "@/utils/Logger";
 
 interface UserProfile {
@@ -34,9 +27,38 @@ export default function Profile() {
   const router = useRouter();
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const { isConnectedToKiosk } = useConnectionSimulator();
+  const { downloadedCourses, downloadedBooks } = useDownloads();
   const [isSyncing, setIsSyncing] = useState(false);
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const previousConnectionState = useRef(isConnectedToKiosk);
+
+  // Compute real user statistics from downloaded data
+  const stats = useMemo(() => {
+    const coursesStarted = downloadedCourses.length;
+    const completedLessons = downloadedCourses.reduce(
+      (sum, course) => sum + course.lessons.filter((l) => l.isCompleted).length,
+      0
+    );
+    const booksRead = downloadedBooks.length;
+
+    // Estimate study time from completed lesson durations
+    const studyMinutes = downloadedCourses.reduce((sum, course) => {
+      return sum + course.lessons
+        .filter((l) => l.isCompleted)
+        .reduce((s, l) => {
+          const match = l.duration?.match(/(\d+)\s*min/i);
+          return s + (match ? parseInt(match[1], 10) : 0);
+        }, 0);
+    }, 0);
+    const studyHours = Math.floor(studyMinutes / 60);
+    const studyTimeLabel = studyMinutes === 0
+      ? '0h'
+      : studyHours > 0
+        ? `${studyHours}h${studyMinutes % 60 > 0 ? (studyMinutes % 60) + 'min' : ''}`
+        : `${studyMinutes}min`;
+
+    return { coursesStarted, completedLessons, studyTimeLabel, booksRead };
+  }, [downloadedCourses, downloadedBooks]);
 
   const loadUserProfile = useCallback(async () => {
     try {
@@ -109,85 +131,6 @@ export default function Profile() {
         },
       ]
     );
-  };
-
-  // Developer Tools: Test notification functions
-  const handleTestInactivity = async () => {
-    try {
-      await testInactivityNotification();
-      Alert.alert(
-        "Notification programmée ✅",
-        "La notification d'inactivité apparaîtra dans 5 secondes. Mettez l'app en arrière-plan pour la voir.",
-        [{ text: "OK" }]
-      );
-    } catch {
-      Alert.alert("Erreur", "Impossible de programmer la notification");
-    }
-  };
-
-  const handleTestCourseCompletion = async () => {
-    try {
-      await testCourseCompletionNotification();
-      Alert.alert(
-        "Notification programmée ✅",
-        "La notification de fin de cours apparaîtra dans 5 secondes. Mettez l'app en arrière-plan pour la voir.",
-        [{ text: "OK" }]
-      );
-    } catch {
-      Alert.alert("Erreur", "Impossible de programmer la notification");
-    }
-  };
-
-  const handleTestLessonContinuation = async () => {
-    try {
-      await testLessonContinuationNotification();
-      Alert.alert(
-        "Notification programmée ✅",
-        "La notification de continuation apparaîtra dans 5 secondes. Mettez l'app en arrière-plan pour la voir.",
-        [{ text: "OK" }]
-      );
-    } catch {
-      Alert.alert("Erreur", "Impossible de programmer la notification");
-    }
-  };
-
-  const handleTestNewContent = async () => {
-    try {
-      await testNewContentNotification();
-      Alert.alert(
-        "Notification programmée ✅",
-        "La notification de nouveau contenu apparaîtra dans 5 secondes. Mettez l'app en arrière-plan pour la voir.",
-        [{ text: "OK" }]
-      );
-    } catch {
-      Alert.alert("Erreur", "Impossible de programmer la notification");
-    }
-  };
-
-  const handleTestNextSession = async () => {
-    try {
-      await testNextSessionNotification();
-      Alert.alert(
-        "Notification programmée ✅",
-        "La notification de prochaine séance apparaîtra dans 5 secondes. Mettez l'app en arrière-plan pour la voir.",
-        [{ text: "OK" }]
-      );
-    } catch {
-      Alert.alert("Erreur", "Impossible de programmer la notification");
-    }
-  };
-
-  const handleTestLowStorage = async () => {
-    try {
-      await testLowStorageNotification();
-      Alert.alert(
-        "Notification programmée ✅",
-        "La notification d'espace faible apparaîtra dans 5 secondes. Mettez l'app en arrière-plan pour la voir.",
-        [{ text: "OK" }]
-      );
-    } catch {
-      Alert.alert("Erreur", "Impossible de programmer la notification");
-    }
   };
 
   if (!userProfile) {
@@ -325,7 +268,7 @@ export default function Profile() {
                 <View style={styles.statIconContainer}>
                   <Ionicons name="book" size={28} color="#1E3A5F" />
                 </View>
-                <Text style={styles.statValue}>12</Text>
+                <Text style={styles.statValue}>{stats.coursesStarted}</Text>
                 <Text style={styles.statLabel}>Cours suivis</Text>
               </View>
 
@@ -333,7 +276,7 @@ export default function Profile() {
                 <View style={styles.statIconContainer}>
                   <Ionicons name="checkmark-circle" size={28} color="#17A2B8" />
                 </View>
-                <Text style={styles.statValue}>45</Text>
+                <Text style={styles.statValue}>{stats.completedLessons}</Text>
                 <Text style={styles.statLabel}>Leçons complétées</Text>
               </View>
 
@@ -341,7 +284,7 @@ export default function Profile() {
                 <View style={styles.statIconContainer}>
                   <Ionicons name="time" size={28} color="#FFD700" />
                 </View>
-                <Text style={styles.statValue}>28h</Text>
+                <Text style={styles.statValue}>{stats.studyTimeLabel}</Text>
                 <Text style={styles.statLabel}>Temps d&apos;étude</Text>
               </View>
 
@@ -349,127 +292,9 @@ export default function Profile() {
                 <View style={styles.statIconContainer}>
                   <Ionicons name="book-outline" size={28} color="#28A745" />
                 </View>
-                <Text style={styles.statValue}>4</Text>
+                <Text style={styles.statValue}>{stats.booksRead}</Text>
                 <Text style={styles.statLabel}>Livres lus</Text>
               </View>
-            </View>
-          </View>
-
-          {/* Developer Tools Section */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Outils de développement</Text>
-            <Text style={styles.devToolsDescription}>
-              Testez les notifications en direct (délai de 5 secondes)
-            </Text>
-
-            <View style={styles.devToolsContainer}>
-              {/* Test Inactivity Notification */}
-              <TouchableOpacity
-                style={styles.devToolButton}
-                onPress={handleTestInactivity}
-                activeOpacity={0.8}
-              >
-                <View style={styles.devToolIconContainer}>
-                  <Ionicons name="time-outline" size={24} color="#1E3A5F" />
-                </View>
-                <View style={styles.devToolTextContainer}>
-                  <Text style={styles.devToolTitle}>Tester la notification d&apos;inactivité</Text>
-                  <Text style={styles.devToolSubtitle}>
-                    &ldquo;On dirait que vous nous avez manqué !&rdquo;
-                  </Text>
-                </View>
-                <Ionicons name="chevron-forward" size={20} color="#A0A0A0" />
-              </TouchableOpacity>
-
-              {/* Test Course Completion Notification */}
-              <TouchableOpacity
-                style={styles.devToolButton}
-                onPress={handleTestCourseCompletion}
-                activeOpacity={0.8}
-              >
-                <View style={[styles.devToolIconContainer, styles.devToolIconSuccess]}>
-                  <Ionicons name="trophy-outline" size={24} color="#28A745" />
-                </View>
-                <View style={styles.devToolTextContainer}>
-                  <Text style={styles.devToolTitle}>Tester la notification de fin de cours</Text>
-                  <Text style={styles.devToolSubtitle}>
-                    &ldquo;Félicitations ! Vous avez terminé...&rdquo;
-                  </Text>
-                </View>
-                <Ionicons name="chevron-forward" size={20} color="#A0A0A0" />
-              </TouchableOpacity>
-
-              {/* Test Lesson Continuation Notification */}
-              <TouchableOpacity
-                style={styles.devToolButton}
-                onPress={handleTestLessonContinuation}
-                activeOpacity={0.8}
-              >
-                <View style={[styles.devToolIconContainer, styles.devToolIconWarning]}>
-                  <Ionicons name="book-outline" size={24} color="#FF9800" />
-                </View>
-                <View style={styles.devToolTextContainer}>
-                  <Text style={styles.devToolTitle}>Tester la notification de continuation</Text>
-                  <Text style={styles.devToolSubtitle}>
-                    &ldquo;N&apos;oubliez pas de finir votre leçon...&rdquo;
-                  </Text>
-                </View>
-                <Ionicons name="chevron-forward" size={20} color="#A0A0A0" />
-              </TouchableOpacity>
-
-              {/* Test New Content Notification */}
-              <TouchableOpacity
-                style={styles.devToolButton}
-                onPress={handleTestNewContent}
-                activeOpacity={0.8}
-              >
-                <View style={[styles.devToolIconContainer, styles.devToolIconInfo]}>
-                  <Ionicons name="download-outline" size={24} color="#17A2B8" />
-                </View>
-                <View style={styles.devToolTextContainer}>
-                  <Text style={styles.devToolTitle}>Tester notif. nouveau contenu</Text>
-                  <Text style={styles.devToolSubtitle}>
-                    &ldquo;De nouvelles leçons et livres sont disponibles...&rdquo;
-                  </Text>
-                </View>
-                <Ionicons name="chevron-forward" size={20} color="#A0A0A0" />
-              </TouchableOpacity>
-
-              {/* Test Next Session Notification */}
-              <TouchableOpacity
-                style={styles.devToolButton}
-                onPress={handleTestNextSession}
-                activeOpacity={0.8}
-              >
-                <View style={[styles.devToolIconContainer, styles.devToolIconPurple]}>
-                  <Ionicons name="calendar-outline" size={24} color="#6F42C1" />
-                </View>
-                <View style={styles.devToolTextContainer}>
-                  <Text style={styles.devToolTitle}>Tester notif. prochaine séance</Text>
-                  <Text style={styles.devToolSubtitle}>
-                    &ldquo;Ta prochaine révision n&apos;est pas encore enregistrée...&rdquo;
-                  </Text>
-                </View>
-                <Ionicons name="chevron-forward" size={20} color="#A0A0A0" />
-              </TouchableOpacity>
-
-              {/* Test Low Storage Notification */}
-              <TouchableOpacity
-                style={styles.devToolButton}
-                onPress={handleTestLowStorage}
-                activeOpacity={0.8}
-              >
-                <View style={[styles.devToolIconContainer, styles.devToolIconDanger]}>
-                  <Ionicons name="warning-outline" size={24} color="#DC3545" />
-                </View>
-                <View style={styles.devToolTextContainer}>
-                  <Text style={styles.devToolTitle}>Tester notif. espace faible</Text>
-                  <Text style={styles.devToolSubtitle}>
-                    &ldquo;Tu n&apos;as presque plus d&apos;espace...&rdquo;
-                  </Text>
-                </View>
-                <Ionicons name="chevron-forward" size={20} color="#A0A0A0" />
-              </TouchableOpacity>
             </View>
           </View>
 
@@ -715,67 +540,5 @@ const styles = StyleSheet.create({
     color: "#A0A0A0",
     textAlign: "center",
     marginTop: 20,
-  },
-  // Developer Tools
-  devToolsDescription: {
-    fontSize: 13,
-    color: "#5A5A5A",
-    marginBottom: 16,
-    fontStyle: "italic",
-  },
-  devToolsContainer: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    overflow: "hidden",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  devToolButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
-  },
-  devToolIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: "#EBF0F5",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 12,
-  },
-  devToolIconSuccess: {
-    backgroundColor: "#E8F5E9",
-  },
-  devToolIconWarning: {
-    backgroundColor: "#FFF3E0",
-  },
-  devToolIconInfo: {
-    backgroundColor: "#E3F2FD",
-  },
-  devToolIconPurple: {
-    backgroundColor: "#F3E5F5",
-  },
-  devToolIconDanger: {
-    backgroundColor: "#FFEBEE",
-  },
-  devToolTextContainer: {
-    flex: 1,
-  },
-  devToolTitle: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#2C2C2C",
-    marginBottom: 4,
-  },
-  devToolSubtitle: {
-    fontSize: 12,
-    color: "#5A5A5A",
-    fontStyle: "italic",
   },
 });

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -9,15 +9,16 @@ import {
   useWindowDimensions,
   FlatList,
   Alert,
+  ActivityIndicator,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import ConnectionStatus from "@/components/ConnectionStatus";
 import { useConnectionSimulator } from "@/contexts/ConnectionSimulatorContext";
 import { useDownloads } from "@/contexts/DownloadsContext";
 import { downloadFile, generateFileName } from "@/utils/fileDownloader";
-import { SAMPLE_PDF_URL } from "@/constants/SampleData";
+import { StudentAPI, DownloadAPI, ApiBook } from "@/services/api";
 import logger from "@/utils/Logger";
 import { AcademicBadge } from "@/components/AcademicBadge";
 
@@ -27,75 +28,18 @@ interface Book {
   author: string;
   description: string;
   thumbnail: string;
+  filename: string;
   isDownloaded?: boolean;
 }
 
-// Mock books data
-const MOCK_BOOKS: Book[] = [
-  {
-    id: "1",
-    title: "Une si longue lettre",
-    author: "Mariama Bâ",
-    description: "Un chef-d'œuvre de la littérature africaine francophone.",
-    thumbnail: "📕",
-  },
-  {
-    id: "2",
-    title: "L'Enfant noir",
-    author: "Camara Laye",
-    description: "Une autobiographie touchante sur l'enfance en Afrique.",
-    thumbnail: "📗",
-  },
-  {
-    id: "3",
-    title: "L'alchimiste",
-    author: "Paulo Coelho",
-    description: "Une quête spirituelle et philosophique inoubliable.",
-    thumbnail: "📘",
-  },
-  {
-    id: "4",
-    title: "Pensez et devenez riche",
-    author: "Napoleon Hill",
-    description: "Les clés du succès et de la réussite personnelle.",
-    thumbnail: "📙",
-  },
-  {
-    id: "5",
-    title: "Le Petit Prince",
-    author: "Antoine de Saint-Exupéry",
-    description: "Un conte poétique sur l'amitié et l'amour.",
-    thumbnail: "📔",
-  },
-  {
-    id: "6",
-    title: "Choses dont je suis sûr",
-    author: "Aminata Sow Fall",
-    description: "Réflexions sur la vie et la société.",
-    thumbnail: "📓",
-  },
-  {
-    id: "7",
-    title: "Les Misérables",
-    author: "Victor Hugo",
-    description: "Une épopée sur la justice et la rédemption.",
-    thumbnail: "📕",
-  },
-  {
-    id: "8",
-    title: "Madame Bovary",
-    author: "Gustave Flaubert",
-    description: "Un classique sur les illusions romantiques.",
-    thumbnail: "📗",
-  },
-  {
-    id: "9",
-    title: "Le Ventre de l'Atlantique",
-    author: "Fatou Diome",
-    description: "Entre l'Afrique et l'Europe, une histoire d'émigration.",
-    thumbnail: "📘",
-  },
-];
+const mapApiBookToBook = (book: ApiBook): Book => ({
+  id: book.id,
+  title: book.title,
+  author: book.author,
+  description: "",
+  thumbnail: "📚",
+  filename: book.filename,
+});
 
 export default function Bibliotheque() {
   const router = useRouter();
@@ -108,8 +52,34 @@ export default function Bibliotheque() {
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [downloadingBookId, setDownloadingBookId] = useState<string | null>(null);
+  const [books, setBooks] = useState<Book[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  const filteredBooks = MOCK_BOOKS.filter(
+  const fetchBooks = useCallback(async () => {
+    if (!isConnectedToKiosk) return;
+    setLoading(true);
+    try {
+      const response = await StudentAPI.getLibraryBooks(searchQuery || undefined);
+      setBooks(response.success && response.books ? response.books.map(mapApiBookToBook) : []);
+    } catch (err) {
+      logger.error("Failed to fetch library books:", err);
+      setBooks([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [isConnectedToKiosk, searchQuery]);
+
+  useEffect(() => {
+    fetchBooks();
+  }, [fetchBooks]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (isConnectedToKiosk) fetchBooks();
+    }, [isConnectedToKiosk, fetchBooks])
+  );
+
+  const filteredBooks = books.filter(
     (book) =>
       book.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       book.author.toLowerCase().includes(searchQuery.toLowerCase())
@@ -121,7 +91,7 @@ export default function Bibliotheque() {
   };
 
   const handleDownload = async (bookId: string) => {
-    const book = MOCK_BOOKS.find(b => b.id === bookId);
+    const book = books.find(b => b.id === bookId);
     if (!book) return;
 
     setDownloadingBookId(bookId);
@@ -132,8 +102,11 @@ export default function Bibliotheque() {
       // Generate filename for the PDF
       const fileName = generateFileName(bookId, book.title, 'pdf');
 
+      // Get remote URL from API
+      const remoteUrl = DownloadAPI.getBookUrl(book.filename);
+
       // Actually download the PDF file to local storage
-      const localUri = await downloadFile(SAMPLE_PDF_URL, fileName, (progress) => {
+      const localUri = await downloadFile(remoteUrl, fileName, (progress) => {
         logger.info(`Download progress: ${progress.progress.toFixed(2)}%`);
       });
 
@@ -318,16 +291,31 @@ export default function Bibliotheque() {
         </View>
 
         {/* Books Grid */}
-        <FlatList
-          key={numColumns}
-          data={filteredBooks}
-          renderItem={renderBookCard}
-          keyExtractor={(item) => item.id}
-          numColumns={numColumns}
-          contentContainerStyle={styles.booksGrid}
-          showsVerticalScrollIndicator={false}
-          columnWrapperStyle={styles.bookRow}
-        />
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#1E3A5F" />
+            <Text style={styles.loadingText}>Chargement des livres...</Text>
+          </View>
+        ) : !isConnectedToKiosk && downloadedBooks.length === 0 ? (
+          <View style={styles.offlineContainer}>
+            <Ionicons name="cloud-offline-outline" size={80} color="#1E3A5F" />
+            <Text style={styles.offlineTitle}>Hors ligne</Text>
+            <Text style={styles.offlineMessage}>
+              Connectez-vous au Wi-Fi de l&apos;école pour accéder à la bibliothèque.
+            </Text>
+          </View>
+        ) : (
+          <FlatList
+            key={numColumns}
+            data={filteredBooks}
+            renderItem={renderBookCard}
+            keyExtractor={(item) => item.id}
+            numColumns={numColumns}
+            contentContainerStyle={styles.booksGrid}
+            showsVerticalScrollIndicator={false}
+            columnWrapperStyle={styles.bookRow}
+          />
+        )}
 
         {/* Modal */}
         {renderModal()}
@@ -380,6 +368,36 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     color: "#2C2C2C",
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  loadingText: {
+    fontSize: 16,
+    color: "#5A5A5A",
+    marginTop: 16,
+    fontWeight: "500",
+  },
+  offlineContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 32,
+  },
+  offlineTitle: {
+    fontSize: 24,
+    fontWeight: "700",
+    color: "#1E3A5F",
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  offlineMessage: {
+    fontSize: 16,
+    color: "#5A5A5A",
+    textAlign: "center",
+    lineHeight: 24,
   },
   booksGrid: {
     paddingHorizontal: 18,
