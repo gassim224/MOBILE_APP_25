@@ -14,10 +14,9 @@ import { StatusBar } from 'expo-status-bar';
 import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
+import * as ScreenOrientation from 'expo-screen-orientation';
 import { progressStorage, MediaProgress } from '@/utils/progressStorage';
 import { scheduleLessonContinuationReminder, cancelLessonContinuationReminder } from '@/utils/notificationService';
-
-const { width, height } = Dimensions.get('window');
 
 export default function VideoPlayer() {
   const router = useRouter();
@@ -35,7 +34,22 @@ export default function VideoPlayer() {
   const [position, setPosition] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isSeeking, setIsSeeking] = useState(false);
+  const [screenDims, setScreenDims] = useState(Dimensions.get('window'));
   const hideControlsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Unlock orientation on mount and lock back to portrait on unmount
+  useEffect(() => {
+    ScreenOrientation.unlockAsync();
+
+    const subscription = Dimensions.addEventListener('change', ({ window }) => {
+      setScreenDims(window);
+    });
+
+    return () => {
+      subscription.remove();
+      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+    };
+  }, []);
 
   // Debug: Log video URL
   useEffect(() => {
@@ -228,7 +242,7 @@ export default function VideoPlayer() {
         <Video
           ref={videoRef}
           source={{ uri: demoVideoUrl }}
-          style={styles.video}
+          style={{ width: screenDims.width, height: screenDims.height }}
           resizeMode={ResizeMode.CONTAIN}
           shouldPlay={false}
           onPlaybackStatusUpdate={handlePlaybackStatusUpdate}
@@ -314,10 +328,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  video: {
-    width: width,
-    height: height,
   },
   loadingContainer: {
     ...StyleSheet.absoluteFillObject,

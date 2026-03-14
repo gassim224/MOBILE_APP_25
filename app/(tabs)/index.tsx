@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   Dimensions,
-  Switch,
   Modal,
 } from "react-native";
 import { useRouter } from "expo-router";
@@ -15,6 +14,7 @@ import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useConnectionSimulator } from "@/contexts/ConnectionSimulatorContext";
 import { useDownloads } from "@/contexts/DownloadsContext";
+import { progressStorage } from "@/utils/progressStorage";
 import logger from "@/utils/Logger";
 import { UserProfile, Course, Book } from "@/types";
 import { AcademicBadge } from "@/components/AcademicBadge";
@@ -145,7 +145,28 @@ export default function Home() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
   const [bookModalVisible, setBookModalVisible] = useState(false);
-  const { isConnectedToKiosk, isSimulatorEnabled, setSimulatedConnectionState, toggleSimulator } = useConnectionSimulator();
+  const [bookProgressMap, setBookProgressMap] = useState<Record<string, number>>({});
+  const { isConnectedToKiosk } = useConnectionSimulator();
+
+  // Load book progress from storage
+  useEffect(() => {
+    const loadBookProgress = async () => {
+      if (downloadedBooks.length === 0) return;
+      const progressMap: Record<string, number> = {};
+      for (const book of downloadedBooks) {
+        const p = await progressStorage.getProgress(book.id);
+        if (p && p.type === 'pdf' && p.position > 0) {
+          // Calculate percentage: position = current page, duration = total pages
+          const pct = p.duration && p.duration > 0
+            ? Math.round((p.position / p.duration) * 100)
+            : 0;
+          progressMap[book.id] = Math.min(pct, 100);
+        }
+      }
+      setBookProgressMap(progressMap);
+    };
+    loadBookProgress();
+  }, [downloadedBooks]);
 
   // Create dynamic recent activities from downloaded content
   const recentActivities: RecentActivity[] = [
@@ -165,13 +186,14 @@ export default function Home() {
         lastAccessed: course.downloadedAt,
       };
     }),
-    // Add downloaded books
+    // Add downloaded books with progress if available
     ...downloadedBooks.map(book => ({
       id: `book-${book.id}`,
       type: "book" as const,
       title: book.title,
       subtitle: book.author,
       thumbnail: book.thumbnail,
+      progress: bookProgressMap[book.id] !== undefined ? Math.min(bookProgressMap[book.id], 100) : undefined,
       lastAccessed: book.downloadedAt,
     })),
   ];
@@ -248,19 +270,6 @@ export default function Home() {
     }
   };
 
-  const toggleConnectionSimulator = async () => {
-    try {
-      // Always enable the simulator when user toggles the switch
-      if (!isSimulatorEnabled) {
-        await toggleSimulator();
-      }
-      // Set the simulated connection state
-      await setSimulatedConnectionState(!isConnectedToKiosk);
-    } catch (error) {
-      logger.error("Error toggling connection:", error);
-    }
-  };
-
   const renderCourseCard = (course: Course) => (
     <TouchableOpacity
       key={course.id}
@@ -278,9 +287,6 @@ export default function Home() {
       </View>
       <Text style={styles.courseTitle} numberOfLines={2}>
         {course.title}
-      </Text>
-      <Text style={styles.courseDescription} numberOfLines={1}>
-        {course.description}
       </Text>
     </TouchableOpacity>
   );
@@ -412,21 +418,6 @@ export default function Home() {
             </Text>
           </View>
 
-          {/* Connection Toggle Switch */}
-          {isSimulatorEnabled && (
-            <View style={styles.connectionToggle}>
-              <Text style={styles.connectionToggleLabel}>
-                {isConnectedToKiosk ? "🟢 En Ligne" : "🔴 Hors Ligne"}
-              </Text>
-              <Switch
-                value={isConnectedToKiosk}
-                onValueChange={toggleConnectionSimulator}
-                trackColor={{ false: "#DC3545", true: "#4CAF50" }}
-                thumbColor="#FFFFFF"
-                ios_backgroundColor="#DC3545"
-              />
-            </View>
-          )}
         </View>
 
         <ScrollView
@@ -474,7 +465,7 @@ export default function Home() {
                   <TouchableOpacity
                     style={styles.seeAllButton}
                     activeOpacity={0.7}
-                    onPress={() => router.push("/all-courses")}
+                    onPress={() => router.push("/(tabs)/cours")}
                   >
                     <Text style={styles.seeAllText}>Voir tout</Text>
                     <Ionicons name="chevron-forward" size={16} color="#1E3A5F" />
@@ -656,22 +647,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#2C2C2C",
     marginTop: 8,
-  },
-
-  // Connection Toggle
-  connectionToggle: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 20,
-    gap: 8,
-  },
-  connectionToggleLabel: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#FFFFFF",
   },
 
   // Recent Activity / Continue Learning

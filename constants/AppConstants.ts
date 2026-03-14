@@ -60,8 +60,8 @@ export const MESSAGES = {
   DOWNLOAD: 'Télécharger',
 } as const;
 
-// Kiosk detection keywords
-export const KIOSK_SSID_KEYWORDS = ['ecole', 'school', 'kiosk'] as const;
+// Kiosk detection keywords — add your Raspberry Pi's WiFi SSID (or part of it) here
+export const KIOSK_SSID_KEYWORDS = ['ecole', 'school', 'kiosk', 'raspberry', 'raspi', 'bonecole'] as const;
 
 // App Info
 export const APP_INFO = {
