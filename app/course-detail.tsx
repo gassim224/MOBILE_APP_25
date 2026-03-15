@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -90,6 +90,10 @@ export default function CourseDetail() {
   const { isConnectedToKiosk } = useConnectionSimulator();
   const { addDownloadedCourse, downloadedCourses } = useDownloads();
 
+  // Ref so the fetch effect can access downloadedCourses without re-running on every download
+  const downloadedCoursesRef = useRef(downloadedCourses);
+  useEffect(() => { downloadedCoursesRef.current = downloadedCourses; }, [downloadedCourses]);
+
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [downloadingLessonId, setDownloadingLessonId] = useState<string | null>(null);
   const [downloadingAll, setDownloadingAll] = useState(false);
@@ -102,19 +106,8 @@ export default function CourseDetail() {
   const courseDescription = (params.description as string | undefined) || "";
   const courseId = (params.id as string | undefined) || "unknown";
 
-  // Load downloaded course content for offline mode — uses context (same storage as addDownloadedCourse)
-  const loadDownloadedCourseContent = useCallback(() => {
-    const downloadedCourse = downloadedCourses.find(c => c.id === courseId || c.title === courseTitle);
-    if (downloadedCourse && downloadedCourse.lessons.length > 0) {
-      setLessons(downloadedCourse.lessons.map(lesson => ({ ...lesson, isDownloaded: true })));
-      setError(null);
-    } else {
-      setLessons([]);
-      setError("Ce cours n'a pas été téléchargé");
-    }
-  }, [courseId, courseTitle, downloadedCourses]);
-
-  // Fetch course content from API or load downloaded content
+  // Fetch course content from API or load downloaded content.
+  // Does NOT depend on downloadedCourses — the sync effect below handles isDownloaded updates.
   useEffect(() => {
     const fetchCourseContent = async () => {
       if (!params.title) {
@@ -126,7 +119,15 @@ export default function CourseDetail() {
       setError(null);
 
       if (!isConnectedToKiosk) {
-        loadDownloadedCourseContent();
+        // Read from ref to avoid this effect re-running on every download
+        const downloadedCourse = downloadedCoursesRef.current.find(c => c.id === courseId || c.title === courseTitle);
+        if (downloadedCourse && downloadedCourse.lessons.length > 0) {
+          setLessons(downloadedCourse.lessons.map(lesson => ({ ...lesson, isDownloaded: true })));
+          setError(null);
+        } else {
+          setLessons([]);
+          setError("Ce cours n'a pas été téléchargé");
+        }
         setLoading(false);
         return;
       }
@@ -154,7 +155,8 @@ export default function CourseDetail() {
     };
 
     fetchCourseContent();
-  }, [params.title, courseTitle, courseId, router, isConnectedToKiosk, loadDownloadedCourseContent]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.title, courseTitle, courseId, isConnectedToKiosk]);
 
   // Categorize lessons
   const categorizedLessons = categorizeLessons(lessons);
