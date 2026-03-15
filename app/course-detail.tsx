@@ -19,7 +19,6 @@ import { downloadFile, generateFileName } from "@/utils/fileDownloader";
 import logger from "@/utils/Logger";
 import { AcademicBadge } from "@/components/AcademicBadge";
 import { StudentAPI, DownloadAPI, ApiVideo, ApiPdf, ApiPastPaper } from "@/services/api";
-import { getDownloadedCourses } from "@/services/downloadService";
 
 type TabType = 'lessons' | 'texts' | 'exercises';
 
@@ -103,24 +102,17 @@ export default function CourseDetail() {
   const courseDescription = (params.description as string | undefined) || "";
   const courseId = (params.id as string | undefined) || "unknown";
 
-  // Load downloaded course content for offline mode
-  const loadDownloadedCourseContent = useCallback(async () => {
-    try {
-      const downloadedCoursesList = await getDownloadedCourses();
-      const downloadedCourse = downloadedCoursesList.find(c => c.id === courseId || c.title === courseTitle);
-      if (downloadedCourse && downloadedCourse.lessons.length > 0) {
-        setLessons(downloadedCourse.lessons.map(lesson => ({ ...lesson, isDownloaded: true })));
-        setError(null);
-      } else {
-        setLessons([]);
-        setError("Ce cours n'a pas été téléchargé");
-      }
-    } catch (err) {
-      logger.error("Error loading downloaded course:", err);
+  // Load downloaded course content for offline mode — uses context (same storage as addDownloadedCourse)
+  const loadDownloadedCourseContent = useCallback(() => {
+    const downloadedCourse = downloadedCourses.find(c => c.id === courseId || c.title === courseTitle);
+    if (downloadedCourse && downloadedCourse.lessons.length > 0) {
+      setLessons(downloadedCourse.lessons.map(lesson => ({ ...lesson, isDownloaded: true })));
+      setError(null);
+    } else {
       setLessons([]);
-      setError("Erreur lors du chargement du cours téléchargé");
+      setError("Ce cours n'a pas été téléchargé");
     }
-  }, [courseId, courseTitle]);
+  }, [courseId, courseTitle, downloadedCourses]);
 
   // Fetch course content from API or load downloaded content
   useEffect(() => {
@@ -134,7 +126,7 @@ export default function CourseDetail() {
       setError(null);
 
       if (!isConnectedToKiosk) {
-        await loadDownloadedCourseContent();
+        loadDownloadedCourseContent();
         setLoading(false);
         return;
       }

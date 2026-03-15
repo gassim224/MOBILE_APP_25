@@ -8,7 +8,7 @@ import { useConnectionSimulator } from "@/contexts/ConnectionSimulatorContext";
 import { Course } from "@/types";
 import { AcademicBadge } from "@/components/AcademicBadge";
 import { StudentAPI, ApiSubject } from "@/services/api";
-import { getDownloadedCourses } from "@/services/downloadService";
+import { useDownloads } from "@/contexts/DownloadsContext";
 import logger from "@/utils/Logger";
 
 // Subject descriptions mapping
@@ -36,6 +36,7 @@ const mapSubjectToCourse = (subject: ApiSubject): Course => ({
 function Cours() {
   const router = useRouter();
   const { isConnectedToKiosk } = useConnectionSimulator();
+  const { downloadedCourses: contextDownloadedCourses } = useDownloads();
   const { width } = useWindowDimensions();
   const numColumns = width >= 768 ? 3 : 2;
   const cardWidth = (width - 64) / numColumns;
@@ -43,30 +44,28 @@ function Cours() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const loadDownloadedCourses = useCallback(async () => {
-    try {
-      const downloadedCourses = await getDownloadedCourses();
-      setCourses(downloadedCourses.map(dc => ({
+  const loadDownloadedCourses = useCallback(() => {
+    if (contextDownloadedCourses.length === 0) {
+      setCourses([]);
+      setError("Aucun cours téléchargé");
+    } else {
+      setCourses(contextDownloadedCourses.map(dc => ({
         id: dc.id,
         title: dc.title,
         description: `${dc.lessons.length} leçons téléchargées`,
         thumbnail: dc.thumbnail,
         gradeLevel: "",
       })));
-      setError(downloadedCourses.length === 0 ? "Aucun cours téléchargé" : null);
-    } catch (err) {
-      logger.error("Error loading downloaded courses:", err);
-      setCourses([]);
-      setError("Erreur lors du chargement des cours téléchargés");
+      setError(null);
     }
-  }, []);
+  }, [contextDownloadedCourses]);
 
   useEffect(() => {
     const fetchSubjects = async () => {
       setLoading(true);
       setError(null);
       if (!isConnectedToKiosk) {
-        await loadDownloadedCourses();
+        loadDownloadedCourses();
         setLoading(false);
         return;
       }

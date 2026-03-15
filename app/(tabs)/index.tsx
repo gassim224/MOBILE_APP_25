@@ -20,7 +20,6 @@ import logger from "@/utils/Logger";
 import { UserProfile, Course, Book } from "@/types";
 import { AcademicBadge } from "@/components/AcademicBadge";
 import { StudentAPI, ApiSubject, ApiBook } from "@/services/api";
-import { getDownloadedCourses, getDownloadedBooks } from "@/services/downloadService";
 
 interface RecentActivity {
   id: string;
@@ -78,39 +77,29 @@ export default function Home() {
   const [loadingContent, setLoadingContent] = useState(false);
   const { isConnectedToKiosk } = useConnectionSimulator();
 
-  // Load downloaded content for offline mode
-  const loadDownloadedContent = useCallback(async () => {
-    try {
-      const [dlCourses, dlBooks] = await Promise.all([
-        getDownloadedCourses(),
-        getDownloadedBooks(),
-      ]);
-      setCourses(dlCourses.map(dc => ({
-        id: dc.id,
-        title: dc.title,
-        description: `${dc.lessons.length} leçons téléchargées`,
-        thumbnail: dc.thumbnail,
-        gradeLevel: "",
-      })));
-      setBooks(dlBooks.map(db => ({
-        id: db.id,
-        title: db.title,
-        author: db.author,
-        description: "Téléchargé",
-        thumbnail: db.thumbnail,
-      })));
-    } catch (error) {
-      logger.error("Error loading downloaded content:", error);
-      setCourses([]);
-      setBooks([]);
-    }
-  }, []);
+  // Load downloaded content for offline mode — uses context (same storage as addDownloadedCourse)
+  const loadDownloadedContent = useCallback(() => {
+    setCourses(downloadedCourses.map(dc => ({
+      id: dc.id,
+      title: dc.title,
+      description: `${dc.lessons.length} leçons téléchargées`,
+      thumbnail: dc.thumbnail,
+      gradeLevel: "",
+    })));
+    setBooks(downloadedBooks.map(db => ({
+      id: db.id,
+      title: db.title,
+      author: db.author,
+      description: "Téléchargé",
+      thumbnail: db.thumbnail,
+    })));
+  }, [downloadedCourses, downloadedBooks]);
 
   // Fetch from API when online, load downloads when offline
   const fetchData = useCallback(async () => {
     setLoadingContent(true);
     if (!isConnectedToKiosk) {
-      await loadDownloadedContent();
+      loadDownloadedContent();
       setLoadingContent(false);
       return;
     }
