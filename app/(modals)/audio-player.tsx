@@ -14,6 +14,8 @@ import { StatusBar } from 'expo-status-bar';
 import { Audio, AVPlaybackStatus } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { STORAGE_KEYS } from '@/constants/AppConstants';
 import { progressStorage, MediaProgress } from '@/utils/progressStorage';
 import { scheduleLessonContinuationReminder, cancelLessonContinuationReminder } from '@/utils/notificationService';
 
@@ -66,8 +68,19 @@ export default function AudioPlayer() {
       });
 
       const demoAudioUrl = audioUrl || 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3';
+
+      // Build source with auth headers for remote URLs
+      const isRemote = demoAudioUrl.startsWith('http');
+      const source: { uri: string; headers?: Record<string, string> } = { uri: demoAudioUrl };
+      if (isRemote) {
+        const token = await AsyncStorage.getItem(STORAGE_KEYS.SESSION_TOKEN);
+        if (token) {
+          source.headers = { Authorization: `Bearer ${token}` };
+        }
+      }
+
       const { sound } = await Audio.Sound.createAsync(
-        { uri: demoAudioUrl },
+        source,
         { shouldPlay: false },
         handlePlaybackStatusUpdate
       );

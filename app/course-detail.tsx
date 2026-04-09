@@ -50,6 +50,15 @@ const categorizeLessons = (lessons: Lesson[]) => {
   return categorized;
 };
 
+// Format bytes to human-readable string
+const formatBytes = (bytes?: number): string => {
+  if (!bytes || bytes === 0) return 'N/A';
+  if (bytes < 1024) return `${bytes} o`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} Ko`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} Go`;
+};
+
 // Map API data to Lesson types
 const mapVideoToLesson = (video: ApiVideo, subjectName: string): Lesson => {
   const isAudio = video.filename.toLowerCase().endsWith('.mp3') ||
@@ -59,7 +68,8 @@ const mapVideoToLesson = (video: ApiVideo, subjectName: string): Lesson => {
     id: `video_${video.id}`,
     title: video.title,
     type: isAudio ? 'audio' : 'video',
-    size: 'N/A',
+    size: formatBytes(video.sizeBytes),
+    sizeBytes: video.sizeBytes,
     duration: video.duration,
     isDownloaded: false,
     mediaUrl: DownloadAPI.getVideoUrl(subjectName, video.filename),
@@ -70,7 +80,8 @@ const mapPdfToLesson = (pdf: ApiPdf, subjectName: string): Lesson => ({
   id: `pdf_${pdf.id}`,
   title: pdf.title,
   type: 'pdf',
-  size: 'N/A',
+  size: formatBytes(pdf.sizeBytes),
+  sizeBytes: pdf.sizeBytes,
   isDownloaded: false,
   mediaUrl: DownloadAPI.getPdfUrl(subjectName, pdf.filename),
 });
@@ -79,7 +90,8 @@ const mapPastPaperToLesson = (paper: ApiPastPaper, subjectName: string): Lesson 
   id: `exercise_${paper.id}`,
   title: paper.title,
   type: 'pdf',
-  size: 'N/A',
+  size: formatBytes(paper.sizeBytes),
+  sizeBytes: paper.sizeBytes,
   isDownloaded: false,
   mediaUrl: DownloadAPI.getPdfUrl(subjectName, paper.filename),
 });
@@ -188,15 +200,10 @@ export default function CourseDetail() {
     }
   }, [downloadedCourses, courseId]);
 
-  const totalSize = lessons.reduce((sum, lesson) => {
-    const match = lesson.size.match(/(\d+(?:\.\d+)?)\s*(MB|GB)/i);
-    if (!match) return sum;
-    const value = parseFloat(match[1]);
-    return sum + (match[2].toUpperCase() === 'GB' ? value * 1024 : value);
-  }, 0);
-
   const downloadedCount = lessons.filter((l) => l.isDownloaded).length;
   const totalCount = lessons.length;
+  const totalSizeBytes = lessons.reduce((sum, l) => sum + (l.sizeBytes || 0), 0);
+  const totalSizeFormatted = formatBytes(totalSizeBytes);
 
   const getIconForType = (type: Lesson["type"]) => {
     switch (type) {
@@ -233,8 +240,9 @@ export default function CourseDetail() {
       // Get the remote URL for this lesson
       const remoteUrl = lesson.mediaUrl || '';
 
-      // Generate filename
-      const fileName = generateFileName(lessonId, lesson.title, lesson.type);
+      // Generate filename, preserving original extension from the URL
+      const originalFilename = remoteUrl.split('/').pop()?.split('?')[0];
+      const fileName = generateFileName(lessonId, lesson.title, lesson.type, originalFilename ? decodeURIComponent(originalFilename) : undefined);
 
       logger.info(`Starting download: ${lesson.title}`);
       logger.info(`Remote URL: ${remoteUrl}`);
@@ -329,7 +337,7 @@ export default function CourseDetail() {
 
     Alert.alert(
       MESSAGES.DOWNLOAD_ALL_CONFIRM,
-      `Voulez-vous télécharger toutes les ${totalCount} leçons (environ ${totalSize.toFixed(1)} MB) ?`,
+      `Voulez-vous télécharger toutes les ${totalCount} leçons ?`,
       [
         { text: MESSAGES.CANCEL, style: "cancel" },
         {
@@ -347,8 +355,9 @@ export default function CourseDetail() {
                     // Get remote URL for this lesson
                     const remoteUrl = lesson.mediaUrl || '';
 
-                    // Generate filename
-                    const fileName = generateFileName(lesson.id, lesson.title, lesson.type);
+                    // Generate filename, preserving original extension
+                    const originalFilename = remoteUrl.split('/').pop()?.split('?')[0];
+                    const fileName = generateFileName(lesson.id, lesson.title, lesson.type, originalFilename ? decodeURIComponent(originalFilename) : undefined);
 
                     // Download file to local storage
                     const localUri = await downloadFile(remoteUrl, fileName, (progress) => {
@@ -483,12 +492,13 @@ export default function CourseDetail() {
         <View style={styles.lessonInfo}>
           <Text style={styles.lessonTitle}>{lesson.title}</Text>
           <View style={styles.lessonMeta}>
-            <Text style={styles.lessonSize}>{lesson.size}</Text>
             {lesson.duration && (
-              <>
-                <Text style={styles.lessonMetaSeparator}>•</Text>
-                <Text style={styles.lessonDuration}>{lesson.duration}</Text>
-              </>
+              <Text style={styles.lessonDuration}>{lesson.duration}</Text>
+            )}
+            {lesson.size && lesson.size !== 'N/A' ? (
+              <Text style={styles.lessonSize}>{lesson.size}</Text>
+            ) : (
+              <Text style={styles.lessonSize}>{lesson.type === 'pdf' ? 'PDF' : lesson.type === 'audio' ? 'Audio' : 'Vidéo'}</Text>
             )}
           </View>
         </View>
@@ -562,15 +572,17 @@ export default function CourseDetail() {
 
           <View style={styles.courseStats}>
             <View style={styles.statItem}>
-              <Ionicons name="list" size={16} color="#FFD700" />
+              <Ionicons name="download" size={16} color="#FFD700" />
               <Text style={styles.statText}>
-                {downloadedCount}/{totalCount}
+                {downloadedCount}/{totalCount} téléchargés
               </Text>
             </View>
-            <View style={styles.statItem}>
-              <Ionicons name="cloud-download" size={16} color="#FFD700" />
-              <Text style={styles.statText}>{totalSize.toFixed(1)} MB</Text>
-            </View>
+            {totalSizeBytes > 0 && (
+              <View style={styles.statItem}>
+                <Ionicons name="server-outline" size={16} color="#FFD700" />
+                <Text style={styles.statText}>{totalSizeFormatted}</Text>
+              </View>
+            )}
           </View>
         </View>
 

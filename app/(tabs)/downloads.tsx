@@ -20,6 +20,14 @@ import { getStorageStatus } from "@/utils/storageUtils";
 import { FilterTab, DownloadedCourse, Lesson, DownloadedBook } from "@/types";
 import { AcademicBadge } from "@/components/AcademicBadge";
 
+const formatBytesCompact = (bytes: number): string => {
+  if (bytes <= 0) return '';
+  if (bytes < 1024) return `${bytes} o`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} Ko`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} Go`;
+};
+
 // ─── Sub-components defined at module level (stable references, no re-mounting) ───
 
 interface LessonItemProps {
@@ -55,7 +63,10 @@ function LessonItem({ lesson, courseId, onPress, onDelete, getMediaIcon }: Lesso
             {lesson.title}
           </Text>
           <View style={styles.lessonMeta}>
-            <Text style={styles.lessonDuration}>{lesson.duration}</Text>
+            {lesson.duration && <Text style={styles.lessonDuration}>{lesson.duration}</Text>}
+            {lesson.size && lesson.size !== 'N/A' && (
+              <Text style={styles.lessonDuration}>{lesson.size}</Text>
+            )}
             <View style={styles.lessonTypeBadge}>
               <Text style={styles.lessonTypeText}>
                 {lesson.type === 'video' ? '🎥 Vidéo' : lesson.type === 'audio' ? '🎵 Audio' : '📄 PDF'}
@@ -138,6 +149,10 @@ export default function Downloads() {
   const [notifiedCourses, setNotifiedCourses] = useState<Set<string>>(new Set());
 
   const totalDownloads = downloadedCourses.length + downloadedBooks.length;
+  const totalDownloadedBytes = downloadedCourses.reduce(
+    (sum, course) => sum + course.lessons.reduce((s, l) => s + (l.sizeBytes || 0), 0),
+    0
+  );
 
   // Real device storage state
   const [deviceFreeMB, setDeviceFreeMB] = useState<number | null>(null);
@@ -450,6 +465,8 @@ export default function Downloads() {
     const completedLessons = course.lessons.filter((l) => l.isCompleted).length;
     const totalLessons = course.lessons.length;
     const progress = (completedLessons / totalLessons) * 100;
+    const courseSizeBytes = course.lessons.reduce((sum, l) => sum + (l.sizeBytes || 0), 0);
+    const courseSizeFormatted = formatBytesCompact(courseSizeBytes);
 
     return (
       <View key={course.id} style={styles.courseContainer}>
@@ -470,7 +487,7 @@ export default function Downloads() {
             <View style={styles.courseHeaderInfo}>
               <Text style={styles.courseTitle}>{course.title}</Text>
               <Text style={styles.courseStats}>
-                {completedLessons}/{totalLessons} leçons complétées
+                {completedLessons}/{totalLessons} leçons complétées{courseSizeFormatted ? ` · ${courseSizeFormatted}` : ''}
               </Text>
               <Text style={styles.downloadedDate}>{course.downloadedAt}</Text>
 
@@ -555,7 +572,7 @@ export default function Downloads() {
               </View>
               {totalDownloads > 0 && (
                 <Text style={styles.headerSubtitle}>
-                  {totalDownloads} élément{totalDownloads > 1 ? "s" : ""} téléchargé{totalDownloads > 1 ? "s" : ""}
+                  {totalDownloads} élément{totalDownloads > 1 ? "s" : ""} téléchargé{totalDownloads > 1 ? "s" : ""}{totalDownloadedBytes > 0 ? ` · ${formatBytesCompact(totalDownloadedBytes)}` : ''}
                 </Text>
               )}
             </View>

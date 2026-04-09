@@ -40,6 +40,10 @@ export function parseSizeToMB(sizeString: string): number {
  */
 export function calculateCourseSizeMB(course: DownloadedCourse): number {
   return course.lessons.reduce((total, lesson) => {
+    // Prefer sizeBytes if available, fall back to parsing the string
+    if (lesson.sizeBytes && lesson.sizeBytes > 0) {
+      return total + lesson.sizeBytes / (1024 * 1024);
+    }
     return total + parseSizeToMB(lesson.size);
   }, 0);
 }

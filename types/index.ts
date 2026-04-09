@@ -20,6 +20,7 @@ export interface Lesson {
   title: string;
   type: 'video' | 'pdf' | 'audio';
   size: string;
+  sizeBytes?: number;
   duration?: string;
   isDownloaded: boolean;
   isCompleted?: boolean;

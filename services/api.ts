@@ -90,6 +90,7 @@ export interface ApiVideoRaw {
   name: string;
   path: string;
   duration?: number; // in seconds
+  size?: number; // in bytes
 }
 
 // Videos API response - grouped by chapters
@@ -107,6 +108,7 @@ export interface ApiVideo {
   filename: string;
   duration?: string;
   durationSeconds?: number;
+  sizeBytes?: number;
   chapter?: string;
 }
 
@@ -120,6 +122,7 @@ export interface SubjectVideosResponse {
 export interface ApiPdfRaw {
   name: string;
   path: string;
+  size?: number; // in bytes
 }
 
 // PDFs API response
@@ -133,6 +136,7 @@ export interface ApiPdf {
   id: string;
   title: string;
   filename: string;
+  sizeBytes?: number;
 }
 
 export interface SubjectPdfsResponse {
@@ -152,6 +156,7 @@ export interface ApiPastPaper {
   id: string;
   title: string;
   filename: string;
+  sizeBytes?: number;
 }
 
 export interface SubjectPastPapersResponse {
@@ -165,6 +170,7 @@ export interface ApiBookRaw {
   name: string;
   author: string;
   path: string;
+  size?: number; // in bytes
 }
 
 // Library API response
@@ -487,7 +493,7 @@ export const StudentAPI = {
           for (const video of chapterVideos) {
             // Convert duration from seconds to readable format
             let durationStr: string | undefined;
-            if (video.duration) {
+            if (typeof video.duration === 'number' && !isNaN(video.duration) && video.duration > 0) {
               const minutes = Math.floor(video.duration / 60);
               const seconds = video.duration % 60;
               durationStr = seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes} min`;
@@ -499,6 +505,7 @@ export const StudentAPI = {
               filename: video.path,
               duration: durationStr,
               durationSeconds: video.duration,
+              sizeBytes: video.size,
               chapter,
             });
           }
@@ -533,6 +540,7 @@ export const StudentAPI = {
         id: `pdf_${index}`,
         title: pdf.name,
         filename: pdf.path,
+        sizeBytes: pdf.size,
       }));
       
       return {
@@ -563,6 +571,7 @@ export const StudentAPI = {
         id: `paper_${index}`,
         title: paper.name,
         filename: paper.path,
+        sizeBytes: paper.size,
       }));
       
       return {
@@ -627,30 +636,36 @@ export const DownloadAPI = {
    * @param subjectFolder Subject folder name
    * @param filename Video filename
    */
-  getVideoUrl(subjectFolder: string, filename: string): string {
+  getVideoUrl(subjectFolder: string, filePath: string): string {
     const encodedFolder = encodeURIComponent(subjectFolder);
-    const encodedFilename = encodeURIComponent(filename);
-    return `${API_BASE_URL}/student/download-video/${encodedFolder}/${encodedFilename}`;
+    const encodedPath = filePath.split('/').map(encodeURIComponent).join('/');
+    const url = `${API_BASE_URL}/student/download-video/${encodedFolder}/${encodedPath}`;
+    logger.info(`[DownloadAPI] Video URL: ${url}`);
+    return url;
   },
 
   /**
    * Get PDF download URL
    * @param subjectFolder Subject folder name
-   * @param filename PDF filename
+   * @param filePath PDF file path (may contain subdirectories)
    */
-  getPdfUrl(subjectFolder: string, filename: string): string {
+  getPdfUrl(subjectFolder: string, filePath: string): string {
     const encodedFolder = encodeURIComponent(subjectFolder);
-    const encodedFilename = encodeURIComponent(filename);
-    return `${API_BASE_URL}/student/download-pdf/${encodedFolder}/${encodedFilename}`;
+    const encodedPath = filePath.split('/').map(encodeURIComponent).join('/');
+    const url = `${API_BASE_URL}/student/download-pdf/${encodedFolder}/${encodedPath}`;
+    logger.info(`[DownloadAPI] PDF URL: ${url}`);
+    return url;
   },
 
   /**
    * Get library book download URL
-   * @param filename Book filename
+   * @param filePath Book file path
    */
-  getBookUrl(filename: string): string {
-    const encodedFilename = encodeURIComponent(filename);
-    return `${API_BASE_URL}/student/download-libraryBook/${encodedFilename}`;
+  getBookUrl(filePath: string): string {
+    const encodedPath = filePath.split('/').map(encodeURIComponent).join('/');
+    const url = `${API_BASE_URL}/student/download-libraryBook/${encodedPath}`;
+    logger.info(`[DownloadAPI] Book URL: ${url}`);
+    return url;
   },
 
   /**
