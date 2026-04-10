@@ -1,6 +1,8 @@
 import React from 'react';
-import { View, Text, StyleSheet, ViewStyle } from 'react-native';
+import { View, Text, Image, StyleSheet, ViewStyle } from 'react-native';
 import { getBadgeColor, getCourseInitial, getAuthorInitials } from '@/utils/thumbnailUtils';
+
+const bookLogo = require('@/assets/images/book-logo.jpeg');
 
 interface AcademicBadgeProps {
   id: string;
@@ -31,6 +33,9 @@ export const AcademicBadge: React.FC<AcademicBadgeProps> = ({
 }) => {
   const backgroundColor = getBadgeColor(id);
 
+  const hasAuthor = type === 'book' && (!author || author.trim().length === 0);
+  const showLogo = hasAuthor;
+
   // Determine initials based on type
   const displayText = type === 'course'
     ? getCourseInitial(title || '')
@@ -41,6 +46,23 @@ export const AcademicBadge: React.FC<AcademicBadgeProps> = ({
 
   // Determine border radius based on type
   const borderRadius = type === 'course' ? size * 0.15 : size * 0.08;
+
+  if (showLogo) {
+    return (
+      <Image
+        source={bookLogo}
+        style={[
+          {
+            width: size,
+            height: size,
+            borderRadius,
+          },
+          style,
+        ]}
+        resizeMode="cover"
+      />
+    );
+  }
 
   return (
     <View
