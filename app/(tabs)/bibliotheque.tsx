@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -54,36 +54,75 @@ export default function Bibliotheque() {
   const [downloadingBookId, setDownloadingBookId] = useState<string | null>(null);
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
-  const fetchBooks = useCallback(async () => {
+  const [debouncedSearch, setDebouncedSearch] = useState(searchQuery);
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Debounce search query — wait 500ms after user stops typing
+  useEffect(() => {
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 500);
+    return () => {
+      if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    };
+  }, [searchQuery]);
+
+  const fetchBooks = useCallback(async (page: number = 1) => {
     if (!isConnectedToKiosk) return;
-    setLoading(true);
+
+    if (page === 1) {
+      setLoading(true);
+    } else {
+      setLoadingMore(true);
+    }
+
     try {
-      const response = await StudentAPI.getLibraryBooks(searchQuery || undefined);
-      setBooks(response.success && response.books ? response.books.map(mapApiBookToBook) : []);
+      const response = await StudentAPI.getLibraryBooks(debouncedSearch || undefined, page);
+      if (response.success && response.books) {
+        const newBooks = response.books.map(mapApiBookToBook);
+        setBooks(prev => page === 1 ? newBooks : [...prev, ...newBooks]);
+        setTotalPages(response.totalPages || 1);
+        setCurrentPage(page);
+      } else if (page === 1) {
+        setBooks([]);
+      }
     } catch (err) {
       logger.error("Failed to fetch library books:", err);
-      setBooks([]);
+      if (page === 1) setBooks([]);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
-  }, [isConnectedToKiosk, searchQuery]);
+  }, [isConnectedToKiosk, debouncedSearch]);
 
   useEffect(() => {
-    fetchBooks();
+    setCurrentPage(1);
+    setTotalPages(1);
+    fetchBooks(1);
   }, [fetchBooks]);
 
   useFocusEffect(
     useCallback(() => {
-      if (isConnectedToKiosk) fetchBooks();
+      if (isConnectedToKiosk) {
+        setCurrentPage(1);
+        setTotalPages(1);
+        fetchBooks(1);
+      }
     }, [isConnectedToKiosk, fetchBooks])
   );
 
-  const filteredBooks = books.filter(
-    (book) =>
-      book.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      book.author.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const handleLoadMore = useCallback(() => {
+    if (!loadingMore && currentPage < totalPages) {
+      fetchBooks(currentPage + 1);
+    }
+  }, [loadingMore, currentPage, totalPages, fetchBooks]);
+
+  const filteredBooks = books;
 
   const handleBookPress = (book: Book) => {
     setSelectedBook(book);
@@ -314,6 +353,15 @@ export default function Bibliotheque() {
             contentContainerStyle={styles.booksGrid}
             showsVerticalScrollIndicator={false}
             columnWrapperStyle={styles.bookRow}
+            onEndReached={handleLoadMore}
+            onEndReachedThreshold={0.5}
+            ListFooterComponent={
+              loadingMore ? (
+                <View style={styles.footerLoader}>
+                  <ActivityIndicator size="small" color="#1E3A5F" />
+                </View>
+              ) : null
+            }
           />
         )}
 
@@ -402,6 +450,10 @@ const styles = StyleSheet.create({
   booksGrid: {
     paddingHorizontal: 18,
     paddingBottom: 24,
+  },
+  footerLoader: {
+    paddingVertical: 20,
+    alignItems: "center",
   },
   bookRow: {
     justifyContent: "space-between",

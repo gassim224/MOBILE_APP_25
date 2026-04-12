@@ -605,8 +605,9 @@ export const StudentAPI = {
     logger.info('Library API raw response:', JSON.stringify(rawResponse));
     
     if (rawResponse.status && rawResponse.data) {
+      const currentPage = rawResponse.data.page || 1;
       const books: ApiBook[] = rawResponse.data.books.map((book, index) => ({
-        id: `book_${index}`,
+        id: `book_p${currentPage}_${index}`,
         title: book.name,
         author: book.author,
         filename: book.path,
