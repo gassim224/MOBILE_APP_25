@@ -170,8 +170,16 @@ export default function CourseDetail() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.title, courseTitle, courseId, isConnectedToKiosk]);
 
+  // Sort lessons by extracting leading number from title (natural sort: 1, 2, 3, ... 10, 11)
+  const sortedLessons = [...lessons].sort((a, b) => {
+    const numA = parseInt(a.title.match(/^(\d+)/)?.[1] || '0', 10);
+    const numB = parseInt(b.title.match(/^(\d+)/)?.[1] || '0', 10);
+    if (numA !== numB) return numA - numB;
+    return a.title.localeCompare(b.title, 'fr');
+  });
+
   // Categorize lessons
-  const categorizedLessons = categorizeLessons(lessons);
+  const categorizedLessons = categorizeLessons(sortedLessons);
 
   // Get active category lessons
   const getActiveCategoryLessons = () => {

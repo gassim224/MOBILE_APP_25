@@ -512,6 +512,14 @@ export const StudentAPI = {
         }
       }
       
+      // Sort videos by extracting leading number from title (natural sort)
+      videos.sort((a, b) => {
+        const numA = parseInt(a.title.match(/^(\d+)/)?.[1] || '0', 10);
+        const numB = parseInt(b.title.match(/^(\d+)/)?.[1] || '0', 10);
+        if (numA !== numB) return numA - numB;
+        return a.title.localeCompare(b.title, 'fr');
+      });
+
       return {
         success: true,
         videos,

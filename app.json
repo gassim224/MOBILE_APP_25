@@ -2,8 +2,8 @@
   "expo": {
     "name": "Bonecole",
     "slug": "bonecole-offline-first",
-    "version": "1.0.1",
-    "orientation": "portrait",
+    "version": "1.0.3",
+    "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "fastshot",
     "userInterfaceStyle": "automatic",

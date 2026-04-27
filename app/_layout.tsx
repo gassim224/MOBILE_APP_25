@@ -1,6 +1,7 @@
 import { Stack, useRouter, useSegments } from "expo-router";
 import { useEffect, useCallback, useRef } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as ScreenOrientation from "expo-screen-orientation";
 import { ConnectionSimulatorProvider } from "@/contexts/ConnectionSimulatorContext";
 import { DownloadsProvider } from "@/contexts/DownloadsContext";
 import { initializeNotificationService, updateLastAppOpenTimestamp } from "@/utils/notificationService";
@@ -47,6 +48,10 @@ export default function RootLayout() {
   useEffect(() => {
     checkAuthStatus();
   }, [checkAuthStatus]);
+
+  useEffect(() => {
+    ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+  }, []);
 
   // Initialize notification service on app launch
   useEffect(() => {

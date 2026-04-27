@@ -77,9 +77,8 @@ export default function AllCourses() {
     loadUserProfile();
   }, [loadUserProfile]);
 
-  const filteredCourses = userProfile?.grade
-    ? courses.filter(course => !course.gradeLevel || course.gradeLevel === userProfile.grade)
-    : courses;
+  // No client-side grade filter — the API already returns subjects for the logged-in student's class
+  const filteredCourses = courses;
 
   const handleCoursePress = (course: Course) => {
     router.push({
