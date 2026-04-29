@@ -14,6 +14,9 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { progressStorage, MediaProgress } from '@/utils/progressStorage';
 import { scheduleLessonContinuationReminder, cancelLessonContinuationReminder } from '@/utils/notificationService';
+import { emitContentAccessed, emitContentConsumedOnce, emitExerciseCompletedOnce } from '@/services/analyticsService';
+import { useConnectionSimulator } from '@/contexts/ConnectionSimulatorContext';
+import { ANALYTICS } from '@/constants/AppConstants';
 
 // Conditionally import react-native-pdf only for native platforms
 let Pdf: any = null;
@@ -26,7 +29,8 @@ const { width, height } = Dimensions.get('window');
 
 export default function PdfReader() {
   const router = useRouter();
-  const { itemId, itemTitle, pdfUrl } = useLocalSearchParams<{
+  const { isConnectedToKiosk } = useConnectionSimulator();
+  const { itemId, itemTitle, pdfUrl, itemType } = useLocalSearchParams<{
     itemId: string;
     itemTitle: string;
     pdfUrl: string;
@@ -43,6 +47,19 @@ export default function PdfReader() {
   useEffect(() => {
     if (Platform.OS !== 'web') {
       loadProgress();
+    }
+    // Analytics: emit content_accessed_offline on PDF open. Books are 'ebook',
+    // lessons are 'course' or 'exercise' (we infer exercise from title keywords).
+    if (itemId && itemTitle) {
+      const isBook = itemType === 'book';
+      const isExercise =
+        !isBook && /exerc|annale|corrig/i.test(itemTitle);
+      emitContentAccessed({
+        lessonId: itemId,
+        lessonTitle: itemTitle,
+        contentType: isBook ? 'ebook' : isExercise ? 'exercise' : 'course',
+        offline: !isConnectedToKiosk,
+      }).catch(() => undefined);
     }
     return () => {
       if (hideHeaderTimer.current) {
@@ -104,9 +121,34 @@ export default function PdfReader() {
     setTotalPages(numberOfPages);
     saveProgress(page);
 
+    // Analytics: fire content_consumed once when reader passes 50% of pages.
+    // Skip for books — gassim said no consumption tracking for ebooks.
+    if (itemId && itemTitle && itemType !== 'book' && numberOfPages > 0) {
+      const isExercise = /exerc|annale|corrig/i.test(itemTitle);
+      const ratio = page / numberOfPages;
+      if (ratio >= ANALYTICS.CONSUMED_THRESHOLD) {
+        emitContentConsumedOnce({
+          offline: !isConnectedToKiosk,
+          content: {
+            content_id: itemId,
+            content_type: isExercise ? 'exercise' : 'course',
+            content_title: itemTitle,
+          },
+        }).catch(() => undefined);
+      }
+    }
+
     // If user reached the last page, cancel continuation reminder
     if (page === numberOfPages && itemId) {
       cancelLessonContinuationReminder(itemId);
+      // Analytics: an exercise PDF completed end-to-end fires exercises_completed
+      const isExercise = itemType !== 'book' && /exerc|annale|corrig/i.test(itemTitle || '');
+      if (isExercise && itemTitle) {
+        emitExerciseCompletedOnce({
+          offline: !isConnectedToKiosk,
+          content: { content_id: itemId, content_type: 'exercise', content_title: itemTitle },
+        }).catch(() => undefined);
+      }
     }
   };
 

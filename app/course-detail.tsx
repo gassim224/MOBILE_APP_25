@@ -19,6 +19,18 @@ import { downloadFile, generateFileName } from "@/utils/fileDownloader";
 import logger from "@/utils/Logger";
 import { AcademicBadge } from "@/components/AcademicBadge";
 import { StudentAPI, DownloadAPI, ApiVideo, ApiPdf, ApiPastPaper } from "@/services/api";
+import { enqueueEvent, type ContentType } from "@/services/analyticsService";
+
+// Map a Lesson to its analytics content_type. PDFs that look like exercises
+// (annale/corrigé/exercice) count as 'exercise'; everything else is 'course'.
+const lessonContentType = (lesson: Lesson): ContentType => {
+  const isExercise =
+    lesson.id.startsWith('exercise_') ||
+    lesson.title.toLowerCase().includes('exercice') ||
+    lesson.title.toLowerCase().includes('annale') ||
+    lesson.title.toLowerCase().includes('corrigé');
+  return isExercise ? 'exercise' : 'course';
+};
 
 type TabType = 'lessons' | 'texts' | 'exercises';
 
@@ -263,6 +275,18 @@ export default function CourseDetail() {
 
       logger.info(`File downloaded to: ${localUri}`);
 
+      // Analytics: a download only happens while connected to the kiosk, so offline=false.
+      enqueueEvent({
+        event_name: 'content_downloaded',
+        offline: !isConnectedToKiosk,
+        content: {
+          content_id: lesson.id,
+          content_type: lessonContentType(lesson),
+          subject: courseTitle,
+          content_title: lesson.title,
+        },
+      }).catch((e) => logger.error('analytics enqueue failed', e));
+
       // Mark lesson as downloaded in local state
       setLessons((prev) =>
         prev.map((l) => (l.id === lessonId ? { ...l, isDownloaded: true } : l))
@@ -373,6 +397,18 @@ export default function CourseDetail() {
                     });
 
                     logger.info(`Downloaded: ${lesson.title} -> ${localUri}`);
+
+                    // Analytics: emit one content_downloaded event per successfully downloaded lesson
+                    enqueueEvent({
+                      event_name: 'content_downloaded',
+                      offline: !isConnectedToKiosk,
+                      content: {
+                        content_id: lesson.id,
+                        content_type: lessonContentType(lesson),
+                        subject: courseTitle,
+                        content_title: lesson.title,
+                      },
+                    }).catch((e) => logger.error('analytics enqueue failed', e));
 
                     return {
                       ...lesson,

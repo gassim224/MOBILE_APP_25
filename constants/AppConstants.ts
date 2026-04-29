@@ -18,6 +18,17 @@ export const STORAGE_KEYS = {
   MEDIA_PROGRESS_PREFIX: '@media_progress_',
   COURSE_PROGRESS_PREFIX: 'course_progress_',
   LESSON_REMINDER_PREFIX: 'lesson_reminder_',
+  // Analytics events
+  ANALYTICS_EVENT_QUEUE: '@analytics_event_queue',
+  ANALYTICS_FIRST_LOGIN_EMITTED_PREFIX: '@analytics_first_login_emitted_',
+  ANALYTICS_CONSUMED_EMITTED_PREFIX: '@analytics_consumed_emitted_',
+} as const;
+
+// Analytics events backend (cloud, separate from kiosk API base)
+export const ANALYTICS = {
+  EVENTS_BATCH_URL: 'https://admin-api.bonecole.com/api/v1/events/batch',
+  // Lesson is considered "consumed" once playback / read passes this threshold
+  CONSUMED_THRESHOLD: 0.5,
 } as const;
 
 // Time Intervals

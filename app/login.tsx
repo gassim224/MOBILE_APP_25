@@ -19,6 +19,7 @@ import { STORAGE_KEYS, MESSAGES } from "@/constants/AppConstants";
 import { UserProfile } from "@/types";
 import logger from "@/utils/Logger";
 import { AuthAPI, ApiError } from "@/services/api";
+import { emitFirstLoginIfNew } from "@/services/analyticsService";
 
 export default function Login() {
   const router = useRouter();
@@ -58,6 +59,9 @@ export default function Login() {
 
       // Create user profile from API response
       const userProfile: UserProfile = {
+        id: response.user?.id || "",
+        schoolId: response.user?.schoolId || "",
+        role: 'student',
         studentName: response.user?.fullName || response.user?.email || studentId,
         schoolName: response.user?.schoolName || "École",
         grade: response.user?.grade || "",
@@ -67,6 +71,8 @@ export default function Login() {
       // Store user profile (token already stored by AuthAPI.login)
       try {
         await AsyncStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(userProfile));
+        // Emit first_login analytics event (no-op if already fired for this user).
+        await emitFirstLoginIfNew();
       } catch (storageError) {
         logger.error("AsyncStorage error:", storageError);
         Alert.alert(

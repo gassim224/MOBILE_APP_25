@@ -19,6 +19,7 @@ import { useConnectionSimulator } from "@/contexts/ConnectionSimulatorContext";
 import { useDownloads } from "@/contexts/DownloadsContext";
 import { downloadFile, generateFileName } from "@/utils/fileDownloader";
 import { StudentAPI, DownloadAPI, ApiBook } from "@/services/api";
+import { enqueueEvent } from "@/services/analyticsService";
 import logger from "@/utils/Logger";
 import { AcademicBadge } from "@/components/AcademicBadge";
 
@@ -150,6 +151,18 @@ export default function Bibliotheque() {
       });
 
       logger.info(`Book downloaded to: ${localUri}`);
+
+      // Analytics: ebook download event (count only, no consumption tracking per pilot scope)
+      enqueueEvent({
+        event_name: 'ebook_downloaded',
+        offline: !isConnectedToKiosk,
+        content: {
+          content_id: book.id,
+          content_type: 'ebook',
+          content_title: book.title,
+          // Books don't carry a subject in the data model; leave undefined
+        },
+      }).catch((e) => logger.error('analytics enqueue failed', e));
 
       // Add to downloads context with LOCAL file path
       await addDownloadedBook({

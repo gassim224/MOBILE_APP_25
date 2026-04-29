@@ -5,6 +5,7 @@ import * as ScreenOrientation from "expo-screen-orientation";
 import { ConnectionSimulatorProvider } from "@/contexts/ConnectionSimulatorContext";
 import { DownloadsProvider } from "@/contexts/DownloadsContext";
 import { initializeNotificationService, updateLastAppOpenTimestamp } from "@/utils/notificationService";
+import { initAnalytics, flushQueue as flushAnalyticsQueue } from "@/services/analyticsService";
 import { AppState } from "react-native";
 import { STORAGE_KEYS } from "@/constants/AppConstants";
 
@@ -56,12 +57,16 @@ export default function RootLayout() {
   // Initialize notification service on app launch
   useEffect(() => {
     initializeNotificationService();
+    // Wire analytics queue flush — sends pending events when internet is available
+    initAnalytics();
 
     // Listen for app state changes
     const subscription = AppState.addEventListener('change', (nextAppState) => {
       if (nextAppState === 'active') {
         // App came to foreground
         updateLastAppOpenTimestamp();
+        // Try flushing the analytics queue when the user reopens the app
+        flushAnalyticsQueue().catch(() => undefined);
       }
     });
 

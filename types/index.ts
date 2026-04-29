@@ -1,10 +1,15 @@
 // Central type definitions for the application
 
 export interface UserProfile {
+  // Required for analytics event payloads (Bonecole metrics PDF):
+  id: string;          // backend StId — used as event.user_id
+  schoolId: string;    // event.school_id
+  role: 'student' | 'teacher' | 'admin'; // event.role
+  // Display fields used across the app
   studentName: string;
   schoolName: string;
-  grade: string;
-  studentId: string;
+  grade: string;       // doubles as event.grade_level for content events
+  studentId: string;   // human-readable code (e.g., SCH017-0001)
 }
 
 export interface Course {

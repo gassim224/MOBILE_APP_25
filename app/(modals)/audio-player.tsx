@@ -18,9 +18,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEYS } from '@/constants/AppConstants';
 import { progressStorage, MediaProgress } from '@/utils/progressStorage';
 import { scheduleLessonContinuationReminder, cancelLessonContinuationReminder } from '@/utils/notificationService';
+import { emitContentAccessed, emitContentConsumedOnce } from '@/services/analyticsService';
+import { useConnectionSimulator } from '@/contexts/ConnectionSimulatorContext';
+import { ANALYTICS } from '@/constants/AppConstants';
 
 export default function AudioPlayer() {
   const router = useRouter();
+  const { isConnectedToKiosk } = useConnectionSimulator();
   const { lessonId, lessonTitle, audioUrl } = useLocalSearchParams<{
     lessonId: string;
     lessonTitle: string;
@@ -87,6 +91,16 @@ export default function AudioPlayer() {
 
       soundRef.current = sound;
       setIsLoading(false);
+
+      // Analytics: emit content_accessed_offline once on audio open
+      if (lessonId && lessonTitle) {
+        emitContentAccessed({
+          lessonId,
+          lessonTitle,
+          contentType: 'course',
+          offline: !isConnectedToKiosk,
+        }).catch(() => undefined);
+      }
 
       // Load saved progress
       await loadProgress();
@@ -156,6 +170,16 @@ export default function AudioPlayer() {
     // Save progress periodically
     if (status.isPlaying && Math.floor((status.positionMillis || 0) / 5000) % 1 === 0) {
       saveProgress();
+    }
+
+    // Analytics: fire content_consumed once when playback crosses the threshold
+    const dur = status.durationMillis || 0;
+    const pos = status.positionMillis || 0;
+    if (lessonId && lessonTitle && dur > 0 && pos / dur >= ANALYTICS.CONSUMED_THRESHOLD) {
+      emitContentConsumedOnce({
+        offline: !isConnectedToKiosk,
+        content: { content_id: lessonId, content_type: 'course', content_title: lessonTitle },
+      }).catch(() => undefined);
     }
 
     // Audio ended - cancel continuation reminder since lesson is complete

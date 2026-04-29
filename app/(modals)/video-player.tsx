@@ -17,10 +17,14 @@ import Slider from '@react-native-community/slider';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { progressStorage, MediaProgress } from '@/utils/progressStorage';
 import { scheduleLessonContinuationReminder, cancelLessonContinuationReminder } from '@/utils/notificationService';
+import { emitContentAccessed, emitContentConsumedOnce } from '@/services/analyticsService';
+import { useConnectionSimulator } from '@/contexts/ConnectionSimulatorContext';
+import { ANALYTICS } from '@/constants/AppConstants';
 
 export default function VideoPlayer() {
   const router = useRouter();
   const params = useLocalSearchParams();
+  const { isConnectedToKiosk } = useConnectionSimulator();
 
   // Handle array parameters from expo-router
   const lessonId = Array.isArray(params.lessonId) ? params.lessonId[0] : params.lessonId;
@@ -71,9 +75,17 @@ export default function VideoPlayer() {
     }
   }, [lessonId, lessonTitle, videoUrl, params, router]);
 
-  // Load saved progress on mount
+  // Load saved progress on mount + emit content_accessed_offline analytics
   useEffect(() => {
     loadProgress();
+    if (lessonId && lessonTitle) {
+      emitContentAccessed({
+        lessonId,
+        lessonTitle,
+        contentType: 'course',
+        offline: !isConnectedToKiosk,
+      }).catch(() => undefined);
+    }
     return () => {
       if (hideControlsTimer.current) {
         clearTimeout(hideControlsTimer.current);
@@ -153,6 +165,16 @@ export default function VideoPlayer() {
     // Save progress periodically (every 5 seconds of playback)
     if (status.isPlaying && Math.floor((status.positionMillis || 0) / 5000) % 1 === 0) {
       saveProgress();
+    }
+
+    // Analytics: fire content_consumed once when playback crosses the threshold
+    const dur = status.durationMillis || 0;
+    const pos = status.positionMillis || 0;
+    if (lessonId && lessonTitle && dur > 0 && pos / dur >= ANALYTICS.CONSUMED_THRESHOLD) {
+      emitContentConsumedOnce({
+        offline: !isConnectedToKiosk,
+        content: { content_id: lessonId, content_type: 'course', content_title: lessonTitle },
+      }).catch(() => undefined);
     }
 
     // Video ended - cancel continuation reminder since lesson is complete
