@@ -19,12 +19,14 @@ import { progressStorage, MediaProgress } from '@/utils/progressStorage';
 import { scheduleLessonContinuationReminder, cancelLessonContinuationReminder } from '@/utils/notificationService';
 import { emitContentAccessed, emitContentConsumedOnce } from '@/services/analyticsService';
 import { useConnectionSimulator } from '@/contexts/ConnectionSimulatorContext';
+import { useDownloads } from '@/contexts/DownloadsContext';
 import { ANALYTICS } from '@/constants/AppConstants';
 
 export default function VideoPlayer() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const { isConnectedToKiosk } = useConnectionSimulator();
+  const { markLessonCompleteByLessonId } = useDownloads();
 
   // Handle array parameters from expo-router
   const lessonId = Array.isArray(params.lessonId) ? params.lessonId[0] : params.lessonId;
@@ -175,6 +177,10 @@ export default function VideoPlayer() {
         offline: !isConnectedToKiosk,
         content: { content_id: lessonId, content_type: 'course', content_title: lessonTitle },
       }).catch(() => undefined);
+      // Flip lesson.isCompleted in the downloads context so the per-course
+      // progress bar reflects the work. Idempotent — markLessonCompleteByLessonId
+      // returns early when the lesson is already complete.
+      markLessonCompleteByLessonId(lessonId).catch(() => undefined);
     }
 
     // Video ended - cancel continuation reminder since lesson is complete

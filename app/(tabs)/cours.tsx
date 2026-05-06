@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, useWindowDimensions, ListRenderItem, ActivityIndicator } from "react-native";
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, useWindowDimensions, ListRenderItem, ActivityIndicator, ScrollView } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import ConnectionStatus from "@/components/ConnectionStatus";
 import { useConnectionSimulator } from "@/contexts/ConnectionSimulatorContext";
+import { useActiveGrade } from "@/contexts/ActiveGradeContext";
 import { Course } from "@/types";
 import { AcademicBadge } from "@/components/AcademicBadge";
 import { StudentAPI, ApiSubject } from "@/services/api";
@@ -36,6 +37,7 @@ const mapSubjectToCourse = (subject: ApiSubject): Course => ({
 function Cours() {
   const router = useRouter();
   const { isConnectedToKiosk } = useConnectionSimulator();
+  const { activeGrade, availableGrades, canSwitch, setActiveGrade } = useActiveGrade();
   const { downloadedCourses: contextDownloadedCourses } = useDownloads();
   const { width } = useWindowDimensions();
   const numColumns = width >= 768 ? 3 : 2;
@@ -70,7 +72,7 @@ function Cours() {
         return;
       }
       try {
-        const response = await StudentAPI.getSubjects();
+        const response = await StudentAPI.getSubjects(activeGrade);
         if (response.success && response.subjects) {
           setCourses(response.subjects.map(mapSubjectToCourse));
         } else {
@@ -86,7 +88,7 @@ function Cours() {
       }
     };
     fetchSubjects();
-  }, [isConnectedToKiosk, loadDownloadedCourses]);
+  }, [isConnectedToKiosk, loadDownloadedCourses, activeGrade]);
 
   useFocusEffect(
     useCallback(() => {
@@ -142,6 +144,29 @@ function Cours() {
           <ConnectionStatus isConnected={isConnectedToKiosk} />
         </View>
 
+        {/* Teacher grade switcher — only visible for teachers with multiple
+            assigned classes. Refetches the courses list for the picked grade. */}
+        {canSwitch && availableGrades.length > 0 && (
+          <View style={styles.gradeSwitcher}>
+            <Text style={styles.gradeSwitcherLabel}>Classe :</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              {availableGrades.map((g) => {
+                const active = g === activeGrade;
+                return (
+                  <TouchableOpacity
+                    key={g}
+                    onPress={() => setActiveGrade(g)}
+                    style={[styles.gradeChip, active && styles.gradeChipActive]}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.gradeChipText, active && styles.gradeChipTextActive]}>{g}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        )}
+
         {/* Content */}
         {loading ? (
           <View style={styles.loadingContainer}>
@@ -182,6 +207,43 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#F8F9FA",
+  },
+  gradeSwitcher: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+    gap: 8,
+  },
+  gradeSwitcherLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1E3A5F',
+    marginRight: 4,
+  },
+  gradeChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    marginRight: 8,
+  },
+  gradeChipActive: {
+    backgroundColor: '#1E3A5F',
+    borderColor: '#1E3A5F',
+  },
+  gradeChipText: {
+    fontSize: 13,
+    color: '#374151',
+    fontWeight: '500',
+  },
+  gradeChipTextActive: {
+    color: '#FFFFFF',
   },
   header: {
     backgroundColor: "#1E3A5F",

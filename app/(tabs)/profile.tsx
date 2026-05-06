@@ -15,13 +15,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { useConnectionSimulator } from "@/contexts/ConnectionSimulatorContext";
 import { useDownloads } from "@/contexts/DownloadsContext";
 import logger from "@/utils/Logger";
-
-interface UserProfile {
-  studentName: string;
-  schoolName: string;
-  grade: string;
-  studentId: string;
-}
+// Use the central UserProfile type — it includes the role + teacher metadata
+// (subjects, gradeLevels) needed for teacher-aware profile rendering.
+import type { UserProfile } from "@/types";
 
 export default function Profile() {
   const router = useRouter();
@@ -191,10 +187,32 @@ export default function Profile() {
                   <Ionicons name="ribbon" size={20} color="#FFD700" />
                 </View>
                 <View style={styles.infoTextContainer}>
-                  <Text style={styles.infoLabel}>Niveau</Text>
-                  <Text style={styles.infoValue}>Classe {userProfile.grade}</Text>
+                  <Text style={styles.infoLabel}>
+                    {userProfile.role === 'teacher' ? 'Classes attribuées' : 'Niveau'}
+                  </Text>
+                  {userProfile.role === 'teacher' && Array.isArray(userProfile.gradeLevels) && userProfile.gradeLevels.length > 0 ? (
+                    <Text style={styles.infoValue}>{userProfile.gradeLevels.join(', ')}</Text>
+                  ) : (
+                    <Text style={styles.infoValue}>Classe {userProfile.grade}</Text>
+                  )}
                 </View>
               </View>
+
+              {/* Teachers also see their subjects. Hidden for students. */}
+              {userProfile.role === 'teacher' && Array.isArray(userProfile.subjects) && userProfile.subjects.length > 0 && (
+                <>
+                  <View style={styles.divider} />
+                  <View style={styles.infoRow}>
+                    <View style={styles.infoIconContainer}>
+                      <Ionicons name="book" size={20} color="#1E3A5F" />
+                    </View>
+                    <View style={styles.infoTextContainer}>
+                      <Text style={styles.infoLabel}>Matières enseignées</Text>
+                      <Text style={styles.infoValue}>{userProfile.subjects.join(', ')}</Text>
+                    </View>
+                  </View>
+                </>
+              )}
 
               <View style={styles.divider} />
 
@@ -203,7 +221,9 @@ export default function Profile() {
                   <Ionicons name="card" size={20} color="#5A5A5A" />
                 </View>
                 <View style={styles.infoTextContainer}>
-                  <Text style={styles.infoLabel}>ID Élève</Text>
+                  <Text style={styles.infoLabel}>
+                    {userProfile.role === 'teacher' ? 'ID Enseignant' : 'ID Élève'}
+                  </Text>
                   <Text style={styles.infoValue}>{userProfile.studentId}</Text>
                 </View>
               </View>

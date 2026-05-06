@@ -12,13 +12,14 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useConnectionSimulator } from "@/contexts/ConnectionSimulatorContext";
+import { useActiveGrade } from "@/contexts/ActiveGradeContext";
 import { useDownloads } from "@/contexts/DownloadsContext";
 import { Lesson } from "@/types";
 import { MESSAGES } from "@/constants/AppConstants";
 import { downloadFile, generateFileName } from "@/utils/fileDownloader";
 import logger from "@/utils/Logger";
 import { AcademicBadge } from "@/components/AcademicBadge";
-import { StudentAPI, DownloadAPI, ApiVideo, ApiPdf, ApiPastPaper } from "@/services/api";
+import { StudentAPI, DownloadAPI, ApiVideo, ApiPdf, ApiPastPaper, compareLessonsByPrefix } from "@/services/api";
 import { enqueueEvent, type ContentType } from "@/services/analyticsService";
 
 // Map a Lesson to its analytics content_type. PDFs that look like exercises
@@ -112,6 +113,7 @@ export default function CourseDetail() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const { isConnectedToKiosk } = useConnectionSimulator();
+  const { activeGrade } = useActiveGrade();
   const { addDownloadedCourse, downloadedCourses } = useDownloads();
 
   // Ref so the fetch effect can access downloadedCourses without re-running on every download
@@ -158,9 +160,9 @@ export default function CourseDetail() {
 
       try {
         const [videosResponse, pdfsResponse, pastPapersResponse] = await Promise.all([
-          StudentAPI.getSubjectVideos(courseTitle).catch(err => { logger.warn("Failed to fetch videos:", err); return { success: false, videos: [] }; }),
-          StudentAPI.getSubjectPdfs(courseTitle).catch(err => { logger.warn("Failed to fetch PDFs:", err); return { success: false, pdfs: [] }; }),
-          StudentAPI.getSubjectPastPapers(courseTitle).catch(err => { logger.warn("Failed to fetch past papers:", err); return { success: false, pastPapers: [] }; }),
+          StudentAPI.getSubjectVideos(courseTitle, activeGrade).catch(err => { logger.warn("Failed to fetch videos:", err); return { success: false, videos: [] }; }),
+          StudentAPI.getSubjectPdfs(courseTitle, activeGrade).catch(err => { logger.warn("Failed to fetch PDFs:", err); return { success: false, pdfs: [] }; }),
+          StudentAPI.getSubjectPastPapers(courseTitle, activeGrade).catch(err => { logger.warn("Failed to fetch past papers:", err); return { success: false, pastPapers: [] }; }),
         ]);
 
         const allLessons: Lesson[] = [];
@@ -180,15 +182,11 @@ export default function CourseDetail() {
 
     fetchCourseContent();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.title, courseTitle, courseId, isConnectedToKiosk]);
+  }, [params.title, courseTitle, courseId, isConnectedToKiosk, activeGrade]);
 
-  // Sort lessons by extracting leading number from title (natural sort: 1, 2, 3, ... 10, 11)
-  const sortedLessons = [...lessons].sort((a, b) => {
-    const numA = parseInt(a.title.match(/^(\d+)/)?.[1] || '0', 10);
-    const numB = parseInt(b.title.match(/^(\d+)/)?.[1] || '0', 10);
-    if (numA !== numB) return numA - numB;
-    return a.title.localeCompare(b.title, 'fr');
-  });
+  // Multi-segment natural sort so dotted numbers (1.1, 1.2, 1.10, 2.1) order
+  // correctly. The single-integer version put 1.10 between 1.1 and 1.2.
+  const sortedLessons = [...lessons].sort((a, b) => compareLessonsByPrefix(a.title, b.title));
 
   // Categorize lessons
   const categorizedLessons = categorizeLessons(sortedLessons);

@@ -15,6 +15,9 @@ interface DownloadsContextType {
   removeBook: (bookId: string) => Promise<void>;
   removeLesson: (courseId: string, lessonId: string) => Promise<void>;
   updateCourseProgress: (courseId: string, lessonId: string, isCompleted: boolean) => Promise<void>;
+  /** Convenience: mark a lesson complete without needing the parent courseId.
+   *  Used by player screens (video/audio/pdf) which only know the lessonId. */
+  markLessonCompleteByLessonId: (lessonId: string) => Promise<void>;
   clearAllDownloads: () => Promise<void>;
   isLoading: boolean;
 }
@@ -209,6 +212,19 @@ export const DownloadsProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  /**
+   * Find the parent course of a lesson and mark it complete. The progress bar
+   * on the downloads screen reads `lesson.isCompleted` per lesson, so without
+   * this call it stays at 0% even after a student finishes a video.
+   */
+  const markLessonCompleteByLessonId = async (lessonId: string) => {
+    const parent = downloadedCourses.find(c => c.lessons.some(l => l.id === lessonId));
+    if (!parent) return;
+    const lesson = parent.lessons.find(l => l.id === lessonId);
+    if (lesson?.isCompleted) return; // already done — no churn
+    await updateCourseProgress(parent.id, lessonId, true);
+  };
+
   const clearAllDownloads = async () => {
     try {
       // Delete all downloaded files from storage
@@ -236,6 +252,7 @@ export const DownloadsProvider = ({ children }: { children: ReactNode }) => {
         removeBook,
         removeLesson,
         updateCourseProgress,
+        markLessonCompleteByLessonId,
         clearAllDownloads,
         isLoading,
       }}

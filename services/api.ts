@@ -13,7 +13,9 @@ const API_BASE_URL = 'http://10.42.0.1:8001/user';
 const CLOUD_BASE_URL = 'http://10.42.0.1:8001/cloud';
 
 // API Response Types
-// Actual Login API response format
+// Actual Login API response format. Role / Subjects / GradeLevels are present
+// when the kiosk authenticates a teacher; absent for students (the kiosk omits
+// them rather than sending nulls). Mobile treats absent === student.
 export interface LoginApiResponse {
   status: boolean;
   message: string;
@@ -27,6 +29,9 @@ export interface LoginApiResponse {
     Grade: string;
     StudentId: string;
     SchoolName: string;
+    Role?: 'student' | 'teacher';
+    Subjects?: string[];
+    GradeLevels?: string[];
   };
 }
 
@@ -42,6 +47,9 @@ export interface LoginResponse {
     studentId: string;
     schoolName: string;
     schoolId: string;
+    role: 'student' | 'teacher';
+    subjects: string[];      // teacher: list of taught subjects; student: []
+    gradeLevels: string[];   // teacher: list of assigned classes; student: [grade]
   };
   message?: string;
 }
@@ -376,7 +384,9 @@ export const AuthAPI = {
         await AsyncStorage.setItem(STORAGE_KEYS.SESSION_TOKEN, data.token);
         logger.info('Token stored successfully');
 
-        // Transform user data to our format
+        // Transform user data to our format. Role defaults to 'student' so
+        // older kiosks (that don't yet emit Role) keep working unchanged.
+        const role: 'student' | 'teacher' = data.data?.Role === 'teacher' ? 'teacher' : 'student';
         const user: LoginResponse['user'] = data.data ? {
           id: data.data.StId,
           fullName: data.data.fullName,
@@ -386,6 +396,14 @@ export const AuthAPI = {
           studentId: data.data.StudentId,
           schoolName: data.data.SchoolName,
           schoolId: data.data.SchoolId,
+          role,
+          subjects: Array.isArray(data.data.Subjects) ? data.data.Subjects : [],
+          // Teachers carry their full assigned-class list. Students get a
+          // single-element array containing their one grade so consumers can
+          // treat both roles uniformly.
+          gradeLevels: Array.isArray(data.data.GradeLevels) && data.data.GradeLevels.length > 0
+            ? data.data.GradeLevels
+            : data.data.Grade ? [data.data.Grade] : [],
         } : undefined;
 
         return {
@@ -432,20 +450,60 @@ export const AuthAPI = {
   },
 };
 
-// Student API
+// Helper: append ?grade= to a path. Used so teachers can override their default
+// grade on every content endpoint. Students pass undefined; the kiosk ignores
+// query overrides for non-teacher tokens anyway.
+function withGrade(path: string, grade?: string | null): string {
+  if (!grade) return path;
+  const sep = path.includes('?') ? '&' : '?';
+  return `${path}${sep}grade=${encodeURIComponent(grade)}`;
+}
+
+/**
+ * Natural-sort comparator for lesson titles whose leading prefix is a
+ * dotted number sequence (e.g. "0", "1.1", "1.2", "1.10", "2.1").
+ * Splits the prefix on dots and compares each segment numerically, so
+ * "1.10" sorts AFTER "1.2" instead of between "1.1" and "1.2" the way
+ * a string comparison would. Falls back to French-locale string sort
+ * for ties or unprefixed titles.
+ */
+export function compareLessonsByPrefix(a: string, b: string): number {
+  const re = /^([\d.]+)/;
+  const ma = a.match(re)?.[1];
+  const mb = b.match(re)?.[1];
+  if (ma && mb) {
+    const partsA = ma.split('.').map(p => parseInt(p, 10) || 0);
+    const partsB = mb.split('.').map(p => parseInt(p, 10) || 0);
+    const len = Math.max(partsA.length, partsB.length);
+    for (let i = 0; i < len; i++) {
+      const da = partsA[i] ?? 0;
+      const db = partsB[i] ?? 0;
+      if (da !== db) return da - db;
+    }
+  } else if (ma && !mb) {
+    return -1;  // numbered titles come before unnumbered
+  } else if (!ma && mb) {
+    return 1;
+  }
+  return a.localeCompare(b, 'fr');
+}
+
+// Student API. The `grade` parameter is optional; supply it for teachers who
+// have multiple assigned grades. The mobile screens read this from
+// ActiveGradeContext (or getActiveGradeForApi).
 export const StudentAPI = {
   /**
    * Get home screen data
    */
-  async getHome(): Promise<HomeResponse> {
-    return makeRequest<HomeResponse>('/student/home');
+  async getHome(grade?: string | null): Promise<HomeResponse> {
+    return makeRequest<HomeResponse>(withGrade('/student/home', grade));
   },
 
   /**
-   * Get all subjects for the student's class
+   * Get all subjects for the student's class (or teacher's selected grade)
    */
-  async getSubjects(): Promise<SubjectsResponse> {
-    const rawResponse = await makeRequest<SubjectsApiResponse>('/student/subjects');
+  async getSubjects(grade?: string | null): Promise<SubjectsResponse> {
+    const rawResponse = await makeRequest<SubjectsApiResponse>(withGrade('/student/subjects', grade));
     
     logger.info('Subjects API raw response:', JSON.stringify(rawResponse));
     
@@ -477,9 +535,9 @@ export const StudentAPI = {
    * Get videos for a specific subject
    * @param subjectName Name of the subject (e.g., "Français")
    */
-  async getSubjectVideos(subjectName: string): Promise<SubjectVideosResponse> {
+  async getSubjectVideos(subjectName: string, grade?: string | null): Promise<SubjectVideosResponse> {
     const encodedSubject = encodeURIComponent(subjectName);
-    const rawResponse = await makeRequest<SubjectVideosApiResponse>(`/student/subject-videos/${encodedSubject}`);
+    const rawResponse = await makeRequest<SubjectVideosApiResponse>(withGrade(`/student/subject-videos/${encodedSubject}`, grade));
     
     logger.info('Videos API raw response:', JSON.stringify(rawResponse));
     
@@ -512,13 +570,7 @@ export const StudentAPI = {
         }
       }
       
-      // Sort videos by extracting leading number from title (natural sort)
-      videos.sort((a, b) => {
-        const numA = parseInt(a.title.match(/^(\d+)/)?.[1] || '0', 10);
-        const numB = parseInt(b.title.match(/^(\d+)/)?.[1] || '0', 10);
-        if (numA !== numB) return numA - numB;
-        return a.title.localeCompare(b.title, 'fr');
-      });
+      videos.sort((a, b) => compareLessonsByPrefix(a.title, b.title));
 
       return {
         success: true,
@@ -537,9 +589,9 @@ export const StudentAPI = {
    * Get PDFs for a specific subject
    * @param subjectName Name of the subject (e.g., "Français")
    */
-  async getSubjectPdfs(subjectName: string): Promise<SubjectPdfsResponse> {
+  async getSubjectPdfs(subjectName: string, grade?: string | null): Promise<SubjectPdfsResponse> {
     const encodedSubject = encodeURIComponent(subjectName);
-    const rawResponse = await makeRequest<SubjectPdfsApiResponse>(`/student/subject-pdf/${encodedSubject}`);
+    const rawResponse = await makeRequest<SubjectPdfsApiResponse>(withGrade(`/student/subject-pdf/${encodedSubject}`, grade));
     
     logger.info('PDFs API raw response:', JSON.stringify(rawResponse));
     
@@ -568,9 +620,9 @@ export const StudentAPI = {
    * Get past papers for a specific subject
    * @param subjectName Name of the subject (e.g., "Français")
    */
-  async getSubjectPastPapers(subjectName: string): Promise<SubjectPastPapersResponse> {
+  async getSubjectPastPapers(subjectName: string, grade?: string | null): Promise<SubjectPastPapersResponse> {
     const encodedSubject = encodeURIComponent(subjectName);
-    const rawResponse = await makeRequest<SubjectPastPapersApiResponse>(`/student/subject-pastPaper/${encodedSubject}`);
+    const rawResponse = await makeRequest<SubjectPastPapersApiResponse>(withGrade(`/student/subject-pastPaper/${encodedSubject}`, grade));
     
     logger.info('Past Papers API raw response:', JSON.stringify(rawResponse));
     

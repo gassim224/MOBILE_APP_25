@@ -15,6 +15,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import { ANALYTICS, STORAGE_KEYS } from '@/constants/AppConstants';
+import { getActiveGradeForApi } from '@/contexts/ActiveGradeContext';
 import logger from '@/utils/Logger';
 import type { UserProfile } from '@/types';
 
@@ -109,6 +110,11 @@ export async function enqueueEvent(args: {
     return;
   }
 
+  // For teachers the "active grade" is what's currently being viewed; fall back
+  // to the persisted profile.grade for students. This makes content_* events
+  // tag the right grade_level when a teacher is browsing TSM vs TSS, etc.
+  const activeGrade = (await getActiveGradeForApi()) || user.grade || undefined;
+
   const event: AnalyticsEvent = {
     event_name: args.event_name,
     user_id: user.id,
@@ -122,8 +128,7 @@ export async function enqueueEvent(args: {
           content_type: args.content.content_type,
           subject: args.content.subject,
           content_title: args.content.content_title,
-          // Default grade_level to user's grade if not provided
-          grade_level: args.content.grade_level || user.grade || undefined,
+          grade_level: args.content.grade_level || activeGrade,
         }
       : {}),
   };

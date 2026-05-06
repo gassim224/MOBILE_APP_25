@@ -16,6 +16,7 @@ import { progressStorage, MediaProgress } from '@/utils/progressStorage';
 import { scheduleLessonContinuationReminder, cancelLessonContinuationReminder } from '@/utils/notificationService';
 import { emitContentAccessed, emitContentConsumedOnce, emitExerciseCompletedOnce } from '@/services/analyticsService';
 import { useConnectionSimulator } from '@/contexts/ConnectionSimulatorContext';
+import { useDownloads } from '@/contexts/DownloadsContext';
 import { ANALYTICS } from '@/constants/AppConstants';
 
 // Conditionally import react-native-pdf only for native platforms
@@ -30,6 +31,7 @@ const { width, height } = Dimensions.get('window');
 export default function PdfReader() {
   const router = useRouter();
   const { isConnectedToKiosk } = useConnectionSimulator();
+  const { markLessonCompleteByLessonId } = useDownloads();
   const { itemId, itemTitle, pdfUrl, itemType } = useLocalSearchParams<{
     itemId: string;
     itemTitle: string;
@@ -60,6 +62,18 @@ export default function PdfReader() {
         contentType: isBook ? 'ebook' : isExercise ? 'exercise' : 'course',
         offline: !isConnectedToKiosk,
       }).catch(() => undefined);
+
+      // Per spec ("the trigger for this event is open and reading downloaded
+      // exercise"): fire exercises_completed when the user OPENS an exercise
+      // PDF, not only when they reach the last page. Dedup'd per (user, item)
+      // by emitExerciseCompletedOnce, so opening the same exercise twice
+      // doesn't double-count.
+      if (isExercise) {
+        emitExerciseCompletedOnce({
+          offline: !isConnectedToKiosk,
+          content: { content_id: itemId, content_type: 'exercise', content_title: itemTitle },
+        }).catch(() => undefined);
+      }
     }
     return () => {
       if (hideHeaderTimer.current) {
@@ -127,6 +141,8 @@ export default function PdfReader() {
       const isExercise = /exerc|annale|corrig/i.test(itemTitle);
       const ratio = page / numberOfPages;
       if (ratio >= ANALYTICS.CONSUMED_THRESHOLD) {
+        // Mark the lesson complete locally so the per-course progress bar updates.
+        markLessonCompleteByLessonId(itemId).catch(() => undefined);
         emitContentConsumedOnce({
           offline: !isConnectedToKiosk,
           content: {

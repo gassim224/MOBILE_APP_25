@@ -20,11 +20,13 @@ import { progressStorage, MediaProgress } from '@/utils/progressStorage';
 import { scheduleLessonContinuationReminder, cancelLessonContinuationReminder } from '@/utils/notificationService';
 import { emitContentAccessed, emitContentConsumedOnce } from '@/services/analyticsService';
 import { useConnectionSimulator } from '@/contexts/ConnectionSimulatorContext';
+import { useDownloads } from '@/contexts/DownloadsContext';
 import { ANALYTICS } from '@/constants/AppConstants';
 
 export default function AudioPlayer() {
   const router = useRouter();
   const { isConnectedToKiosk } = useConnectionSimulator();
+  const { markLessonCompleteByLessonId } = useDownloads();
   const { lessonId, lessonTitle, audioUrl } = useLocalSearchParams<{
     lessonId: string;
     lessonTitle: string;
@@ -180,6 +182,8 @@ export default function AudioPlayer() {
         offline: !isConnectedToKiosk,
         content: { content_id: lessonId, content_type: 'course', content_title: lessonTitle },
       }).catch(() => undefined);
+      // Mark the lesson complete so the course-progress bar updates.
+      markLessonCompleteByLessonId(lessonId).catch(() => undefined);
     }
 
     // Audio ended - cancel continuation reminder since lesson is complete

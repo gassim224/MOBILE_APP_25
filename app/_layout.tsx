@@ -4,6 +4,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ScreenOrientation from "expo-screen-orientation";
 import { ConnectionSimulatorProvider } from "@/contexts/ConnectionSimulatorContext";
 import { DownloadsProvider } from "@/contexts/DownloadsContext";
+import { ActiveGradeProvider } from "@/contexts/ActiveGradeContext";
 import { initializeNotificationService, updateLastAppOpenTimestamp } from "@/utils/notificationService";
 import { initAnalytics, flushQueue as flushAnalyticsQueue } from "@/services/analyticsService";
 import { AppState } from "react-native";
@@ -78,6 +79,7 @@ export default function RootLayout() {
   return (
     <DownloadsProvider>
       <ConnectionSimulatorProvider>
+        <ActiveGradeProvider>
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="index" />
           <Stack.Screen name="login" />
@@ -106,6 +108,7 @@ export default function RootLayout() {
             }}
           />
         </Stack>
+        </ActiveGradeProvider>
       </ConnectionSimulatorProvider>
     </DownloadsProvider>
   );

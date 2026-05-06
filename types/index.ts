@@ -8,8 +8,11 @@ export interface UserProfile {
   // Display fields used across the app
   studentName: string;
   schoolName: string;
-  grade: string;       // doubles as event.grade_level for content events
+  grade: string;       // current view's grade — for teachers this is the active selection
   studentId: string;   // human-readable code (e.g., SCH017-0001)
+  // Teacher metadata. Students get subjects=[] and gradeLevels=[grade].
+  subjects?: string[];
+  gradeLevels?: string[];
 }
 
 export interface Course {

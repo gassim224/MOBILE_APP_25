@@ -15,6 +15,7 @@ import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useConnectionSimulator } from "@/contexts/ConnectionSimulatorContext";
 import { useDownloads } from "@/contexts/DownloadsContext";
+import { useActiveGrade } from "@/contexts/ActiveGradeContext";
 import { progressStorage } from "@/utils/progressStorage";
 import logger from "@/utils/Logger";
 import { UserProfile, Course, Book } from "@/types";
@@ -76,6 +77,7 @@ export default function Home() {
   const [books, setBooks] = useState<Book[]>([]);
   const [loadingContent, setLoadingContent] = useState(false);
   const { isConnectedToKiosk } = useConnectionSimulator();
+  const { activeGrade, availableGrades, canSwitch, setActiveGrade } = useActiveGrade();
 
   // Load downloaded content for offline mode — uses context (same storage as addDownloadedCourse)
   const loadDownloadedContent = useCallback(() => {
@@ -105,7 +107,7 @@ export default function Home() {
     }
     try {
       const [subjectsResponse, booksResponse] = await Promise.all([
-        StudentAPI.getSubjects().catch(err => { logger.warn("Failed to fetch subjects:", err); return { success: false, subjects: [] }; }),
+        StudentAPI.getSubjects(activeGrade).catch(err => { logger.warn("Failed to fetch subjects:", err); return { success: false, subjects: [] }; }),
         StudentAPI.getLibraryBooks().catch(err => { logger.warn("Failed to fetch books:", err); return { success: false, books: [] }; }),
       ]);
       setCourses(subjectsResponse.success && subjectsResponse.subjects ? subjectsResponse.subjects.map(mapSubjectToCourse) : []);
@@ -117,7 +119,7 @@ export default function Home() {
     } finally {
       setLoadingContent(false);
     }
-  }, [isConnectedToKiosk, loadDownloadedContent]);
+  }, [isConnectedToKiosk, loadDownloadedContent, activeGrade]);
 
   useEffect(() => {
     fetchData();
@@ -401,6 +403,30 @@ export default function Home() {
 
         </View>
 
+        {/* Teacher-only grade switcher. Shown only when the user is a teacher
+            with multiple assigned classes; tapping a chip refetches content
+            for that grade via the kiosk's ?grade= override. */}
+        {canSwitch && availableGrades.length > 0 && (
+          <View style={styles.gradeSwitcher}>
+            <Text style={styles.gradeSwitcherLabel}>Classe :</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              {availableGrades.map((g) => {
+                const active = g === activeGrade;
+                return (
+                  <TouchableOpacity
+                    key={g}
+                    onPress={() => setActiveGrade(g)}
+                    style={[styles.gradeChip, active && styles.gradeChipActive]}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.gradeChipText, active && styles.gradeChipTextActive]}>{g}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        )}
+
         <ScrollView
           style={styles.content}
           contentContainerStyle={styles.contentContainer}
@@ -499,6 +525,43 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#F8F9FA",
+  },
+  gradeSwitcher: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+    gap: 8,
+  },
+  gradeSwitcherLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1E3A5F',
+    marginRight: 4,
+  },
+  gradeChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    marginRight: 8,
+  },
+  gradeChipActive: {
+    backgroundColor: '#1E3A5F',
+    borderColor: '#1E3A5F',
+  },
+  gradeChipText: {
+    fontSize: 13,
+    color: '#374151',
+    fontWeight: '500',
+  },
+  gradeChipTextActive: {
+    color: '#FFFFFF',
   },
   header: {
     backgroundColor: "#1E3A5F",

@@ -22,6 +22,9 @@ export const STORAGE_KEYS = {
   ANALYTICS_EVENT_QUEUE: '@analytics_event_queue',
   ANALYTICS_FIRST_LOGIN_EMITTED_PREFIX: '@analytics_first_login_emitted_',
   ANALYTICS_CONSUMED_EMITTED_PREFIX: '@analytics_consumed_emitted_',
+  // Teacher's currently selected grade (from their assigned list).
+  // Students never read this — their grade is fixed on the JWT.
+  ACTIVE_GRADE: '@active_grade',
 } as const;
 
 // Analytics events backend (cloud, separate from kiosk API base)

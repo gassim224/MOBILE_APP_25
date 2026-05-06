@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, Image, StyleSheet, ViewStyle } from 'react-native';
+import { View, Text, Image, StyleSheet, ViewStyle, ImageStyle } from 'react-native';
 import { getBadgeColor, getCourseInitial, getAuthorInitials } from '@/utils/thumbnailUtils';
 
 const bookLogo = require('@/assets/images/book-logo.jpeg');
@@ -48,17 +48,15 @@ export const AcademicBadge: React.FC<AcademicBadgeProps> = ({
   const borderRadius = type === 'course' ? size * 0.15 : size * 0.08;
 
   if (showLogo) {
+    // The component's `style` prop is typed as ViewStyle (it's normally a View),
+    // but Image only accepts ImageStyle. ViewStyle.overflow allows 'scroll' which
+    // ImageStyle does not — cast through unknown to satisfy TS without changing
+    // the public prop type used by every caller.
+    const imageStyle: ImageStyle = { width: size, height: size, borderRadius };
     return (
       <Image
         source={bookLogo}
-        style={[
-          {
-            width: size,
-            height: size,
-            borderRadius,
-          },
-          style,
-        ]}
+        style={[imageStyle, style as unknown as ImageStyle]}
         resizeMode="cover"
       />
     );

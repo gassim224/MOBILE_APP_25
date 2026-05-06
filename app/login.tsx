@@ -20,9 +20,17 @@ import { UserProfile } from "@/types";
 import logger from "@/utils/Logger";
 import { AuthAPI, ApiError } from "@/services/api";
 import { emitFirstLoginIfNew } from "@/services/analyticsService";
+import { useActiveGrade } from "@/contexts/ActiveGradeContext";
+
+// Persisted across logouts so a user who logged out while offline can sign
+// back in to their downloads. Cleared by an explicit "forget device" action
+// (which we don't expose yet) or by a fresh successful login as a different
+// user (handled below).
+const OFFLINE_PROFILE_KEY = '@offline_profile';
 
 export default function Login() {
   const router = useRouter();
+  const { refresh: refreshActiveGrade } = useActiveGrade();
   const [studentId, setStudentId] = useState<string>("");
   const [password, setPassword] = useState<string>("");
   const [loading, setLoading] = useState(false);
@@ -42,6 +50,26 @@ export default function Login() {
     setLoading(true);
     setIsNavigating(true);
 
+    // Offline relogin: if kiosk is unreachable but we have a cached profile +
+    // saved password for this email, let the user back in to their downloads.
+    // Networked auth still wins when available.
+    const tryOfflineLogin = async (): Promise<boolean> => {
+      try {
+        const raw = await AsyncStorage.getItem(OFFLINE_PROFILE_KEY);
+        if (!raw) return false;
+        const cached = JSON.parse(raw) as { email: string; password: string; profile: UserProfile; token?: string };
+        if (!cached?.email || cached.email.trim().toLowerCase() !== studentId.trim().toLowerCase()) return false;
+        if (cached.password !== password.trim()) return false;
+        await AsyncStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(cached.profile));
+        if (cached.token) await AsyncStorage.setItem(STORAGE_KEYS.SESSION_TOKEN, cached.token);
+        await refreshActiveGrade();
+        return true;
+      } catch (e) {
+        logger.warn('offline login fallback failed', e);
+        return false;
+      }
+    };
+
     try {
       logger.info("Attempting login...");
       const response = await AuthAPI.login(studentId.trim(), password.trim());
@@ -57,20 +85,37 @@ export default function Login() {
         return;
       }
 
-      // Create user profile from API response
+      // Create user profile from API response. Role + subjects + gradeLevels
+      // come from the kiosk now (Phase A backend change). Default to student
+      // so this still works against a kiosk that hasn't been upgraded yet.
       const userProfile: UserProfile = {
         id: response.user?.id || "",
         schoolId: response.user?.schoolId || "",
-        role: 'student',
+        role: response.user?.role || 'student',
         studentName: response.user?.fullName || response.user?.email || studentId,
         schoolName: response.user?.schoolName || "École",
         grade: response.user?.grade || "",
         studentId: response.user?.studentId || studentId,
+        subjects: response.user?.subjects || [],
+        gradeLevels: response.user?.gradeLevels || (response.user?.grade ? [response.user.grade] : []),
       };
 
       // Store user profile (token already stored by AuthAPI.login)
       try {
         await AsyncStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(userProfile));
+        // Persist credentials + profile + token for offline relogin. Stored
+        // under a separate key so logout (which wipes USER_PROFILE) doesn't
+        // erase it; allows the user to sign back in to their downloads when
+        // the kiosk is unreachable.
+        await AsyncStorage.setItem(OFFLINE_PROFILE_KEY, JSON.stringify({
+          email: studentId.trim(),
+          password: password.trim(),
+          profile: userProfile,
+          token: response.token,
+        }));
+        // Refresh the active-grade context so it picks up the new profile
+        // (and resets the stored grade selection if the user changed roles).
+        await refreshActiveGrade();
         // Emit first_login analytics event (no-op if already fired for this user).
         await emitFirstLoginIfNew();
       } catch (storageError) {
@@ -90,12 +135,23 @@ export default function Login() {
       }, 100);
     } catch (error) {
       logger.error("Login error:", error);
-      if (error instanceof ApiError) {
-        Alert.alert("Erreur de connexion", error.message, [{ text: MESSAGES.OK }]);
-      } else if (error instanceof Error && (error.message.includes('Network') || error.message.includes('fetch'))) {
+
+      const looksLikeOffline =
+        (error instanceof ApiError) ||
+        (error instanceof Error && (error.message.includes('Network') || error.message.includes('fetch') || error.message.includes('timeout')));
+
+      // Offline fallback — only if cached creds match. Keeps the user out of
+      // their downloads if it's actually a wrong-password situation.
+      if (looksLikeOffline) {
+        const ok = await tryOfflineLogin();
+        if (ok) {
+          logger.info("Offline relogin succeeded — using cached profile");
+          setTimeout(() => router.replace("/(tabs)"), 100);
+          return;
+        }
         Alert.alert(
-          "Erreur de connexion",
-          "Impossible de se connecter au serveur. Vérifiez que vous êtes connecté au WiFi Bonecole.",
+          "Hors ligne",
+          "Impossible de joindre le serveur de l'école. Connectez-vous au WiFi Bonecole, ou réessayez avec un identifiant déjà utilisé sur cet appareil.",
           [{ text: MESSAGES.OK }]
         );
       } else {
