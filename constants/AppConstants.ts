@@ -27,9 +27,17 @@ export const STORAGE_KEYS = {
   ACTIVE_GRADE: '@active_grade',
 } as const;
 
-// Analytics events backend (cloud, separate from kiosk API base)
+// Analytics events backend.
+// Two paths:
+//   - direct cloud: device has real internet (cellular / home WiFi)
+//   - kiosk relay : device is on the Pi soft AP with no internet — push to
+//     the Pi which will forward to cloud during the school admin's Sync Now.
+// flushQueue() probes the kiosk first; if reachable it uses the relay,
+// otherwise it falls back to direct cloud.
 export const ANALYTICS = {
   EVENTS_BATCH_URL: 'https://admin-api.bonecole.com/api/v1/events/batch',
+  KIOSK_QUEUE_URL: 'http://10.42.0.1:8001/events/queue',
+  KIOSK_PROBE_URL: 'http://10.42.0.1:8001/cloud/school/update',
   // Lesson is considered "consumed" once playback / read passes this threshold
   CONSUMED_THRESHOLD: 0.5,
 } as const;

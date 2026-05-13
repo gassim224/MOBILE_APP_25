@@ -33,6 +33,10 @@ export interface Lesson {
   isDownloaded: boolean;
   isCompleted?: boolean;
   mediaUrl?: string;
+  // Source filename on the kiosk (e.g. "_1.2 Introduction.mp4"). Used for
+  // natural-sort ordering — the chapter prefix lives in the filename even
+  // when the displayed title has been edited.
+  filename?: string;
 }
 
 export interface DownloadedCourse {

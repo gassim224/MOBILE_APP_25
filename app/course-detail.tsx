@@ -86,6 +86,7 @@ const mapVideoToLesson = (video: ApiVideo, subjectName: string): Lesson => {
     duration: video.duration,
     isDownloaded: false,
     mediaUrl: DownloadAPI.getVideoUrl(subjectName, video.filename),
+    filename: video.filename,
   };
 };
 
@@ -97,6 +98,7 @@ const mapPdfToLesson = (pdf: ApiPdf, subjectName: string): Lesson => ({
   sizeBytes: pdf.sizeBytes,
   isDownloaded: false,
   mediaUrl: DownloadAPI.getPdfUrl(subjectName, pdf.filename),
+  filename: pdf.filename,
 });
 
 const mapPastPaperToLesson = (paper: ApiPastPaper, subjectName: string): Lesson => ({
@@ -107,6 +109,7 @@ const mapPastPaperToLesson = (paper: ApiPastPaper, subjectName: string): Lesson 
   sizeBytes: paper.sizeBytes,
   isDownloaded: false,
   mediaUrl: DownloadAPI.getPdfUrl(subjectName, paper.filename),
+  filename: paper.filename,
 });
 
 export default function CourseDetail() {
@@ -184,9 +187,13 @@ export default function CourseDetail() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.title, courseTitle, courseId, isConnectedToKiosk, activeGrade]);
 
-  // Multi-segment natural sort so dotted numbers (1.1, 1.2, 1.10, 2.1) order
-  // correctly. The single-integer version put 1.10 between 1.1 and 1.2.
-  const sortedLessons = [...lessons].sort((a, b) => compareLessonsByPrefix(a.title, b.title));
+  // Sort by source filename ("_1.2 Foo.mp4") so the chapter prefix in the
+  // upstream filename drives ordering even when the displayed title was
+  // edited or never carried the number. Falls back to the title for any
+  // legacy item that lacks a stored filename.
+  const sortedLessons = [...lessons].sort((a, b) =>
+    compareLessonsByPrefix(a.filename || a.title, b.filename || b.title)
+  );
 
   // Categorize lessons
   const categorizedLessons = categorizeLessons(sortedLessons);

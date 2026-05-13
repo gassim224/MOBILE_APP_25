@@ -460,17 +460,25 @@ function withGrade(path: string, grade?: string | null): string {
 }
 
 /**
- * Natural-sort comparator for lesson titles whose leading prefix is a
- * dotted number sequence (e.g. "0", "1.1", "1.2", "1.10", "2.1").
- * Splits the prefix on dots and compares each segment numerically, so
- * "1.10" sorts AFTER "1.2" instead of between "1.1" and "1.2" the way
- * a string comparison would. Falls back to French-locale string sort
- * for ties or unprefixed titles.
+ * Natural-sort comparator for lesson identifiers whose leading prefix is a
+ * dotted number sequence (e.g. "0", "1.1", "1.2", "1.10", "2.1"). Designed
+ * to be fed the kiosk filename (e.g. "_1.2 Introduction.mp4") so chapter
+ * order survives editorial title changes — falls back gracefully for plain
+ * titles like "1.2 Introduction".
+ *
+ * - Strips any directory prefix (takes the basename only).
+ * - Tolerates a single leading underscore before the number ("_1.2 …").
+ * - Splits the dotted prefix on '.' and compares each segment numerically,
+ *   so "1.10" sorts AFTER "1.2" instead of between "1.1" and "1.2".
+ * - Numbered items sort before unnumbered ones; ties fall back to
+ *   French-locale string compare on the original input.
  */
 export function compareLessonsByPrefix(a: string, b: string): number {
-  const re = /^([\d.]+)/;
-  const ma = a.match(re)?.[1];
-  const mb = b.match(re)?.[1];
+  const re = /^_?(\d+(?:\.\d+)*)/;
+  const baseA = a.split(/[\\/]/).pop() ?? a;
+  const baseB = b.split(/[\\/]/).pop() ?? b;
+  const ma = baseA.match(re)?.[1];
+  const mb = baseB.match(re)?.[1];
   if (ma && mb) {
     const partsA = ma.split('.').map(p => parseInt(p, 10) || 0);
     const partsB = mb.split('.').map(p => parseInt(p, 10) || 0);
@@ -481,7 +489,7 @@ export function compareLessonsByPrefix(a: string, b: string): number {
       if (da !== db) return da - db;
     }
   } else if (ma && !mb) {
-    return -1;  // numbered titles come before unnumbered
+    return -1;  // numbered items come before unnumbered
   } else if (!ma && mb) {
     return 1;
   }
@@ -570,7 +578,9 @@ export const StudentAPI = {
         }
       }
       
-      videos.sort((a, b) => compareLessonsByPrefix(a.title, b.title));
+      // Sort by filename so the kiosk's "_1.2 Foo.mp4" prefix drives ordering;
+      // titles can be edited or omit the chapter number, filenames cannot.
+      videos.sort((a, b) => compareLessonsByPrefix(a.filename || a.title, b.filename || b.title));
 
       return {
         success: true,
@@ -602,14 +612,15 @@ export const StudentAPI = {
         filename: pdf.path,
         sizeBytes: pdf.size,
       }));
-      
+      pdfs.sort((a, b) => compareLessonsByPrefix(a.filename || a.title, b.filename || b.title));
+
       return {
         success: true,
         pdfs,
         message: rawResponse.message,
       };
     }
-    
+
     return {
       success: false,
       message: rawResponse.message || 'Failed to fetch PDFs',
@@ -633,7 +644,8 @@ export const StudentAPI = {
         filename: paper.path,
         sizeBytes: paper.size,
       }));
-      
+      pastPapers.sort((a, b) => compareLessonsByPrefix(a.filename || a.title, b.filename || b.title));
+
       return {
         success: true,
         pastPapers,
@@ -672,7 +684,8 @@ export const StudentAPI = {
         author: book.author,
         filename: book.path,
       }));
-      
+      books.sort((a, b) => compareLessonsByPrefix(a.filename || a.title, b.filename || b.title));
+
       return {
         success: true,
         books,

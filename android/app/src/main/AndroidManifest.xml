@@ -27,6 +27,7 @@
         <category android:name="android.intent.category.DEFAULT"/>
         <category android:name="android.intent.category.BROWSABLE"/>
         <data android:scheme="fastshot"/>
+        <data android:scheme="exp+bonecole-offline-first"/>
       </intent-filter>
     </activity>
   </application>

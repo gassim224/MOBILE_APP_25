@@ -51,11 +51,15 @@ export default function PdfReader() {
       loadProgress();
     }
     // Analytics: emit content_accessed_offline on PDF open. Books are 'ebook',
-    // lessons are 'course' or 'exercise' (we infer exercise from title keywords).
+    // lessons are 'course' or 'exercise'. Past papers come through with
+    // id `exercise_paper_*` (see course-detail.tsx mapPastPaperToLesson) — that
+    // is the structural signal. Title keyword check stays as a fallback for
+    // exercise PDFs that aren't past-papers but happen to be named after one.
     if (itemId && itemTitle) {
       const isBook = itemType === 'book';
       const isExercise =
-        !isBook && /exerc|annale|corrig/i.test(itemTitle);
+        !isBook &&
+        (itemId.startsWith('exercise_') || /exerc|annale|corrig/i.test(itemTitle));
       emitContentAccessed({
         lessonId: itemId,
         lessonTitle: itemTitle,
@@ -138,7 +142,8 @@ export default function PdfReader() {
     // Analytics: fire content_consumed once when reader passes 50% of pages.
     // Skip for books — gassim said no consumption tracking for ebooks.
     if (itemId && itemTitle && itemType !== 'book' && numberOfPages > 0) {
-      const isExercise = /exerc|annale|corrig/i.test(itemTitle);
+      const isExercise =
+        itemId.startsWith('exercise_') || /exerc|annale|corrig/i.test(itemTitle);
       const ratio = page / numberOfPages;
       if (ratio >= ANALYTICS.CONSUMED_THRESHOLD) {
         // Mark the lesson complete locally so the per-course progress bar updates.
@@ -158,7 +163,9 @@ export default function PdfReader() {
     if (page === numberOfPages && itemId) {
       cancelLessonContinuationReminder(itemId);
       // Analytics: an exercise PDF completed end-to-end fires exercises_completed
-      const isExercise = itemType !== 'book' && /exerc|annale|corrig/i.test(itemTitle || '');
+      const isExercise =
+        itemType !== 'book' &&
+        (itemId.startsWith('exercise_') || /exerc|annale|corrig/i.test(itemTitle || ''));
       if (isExercise && itemTitle) {
         emitExerciseCompletedOnce({
           offline: !isConnectedToKiosk,

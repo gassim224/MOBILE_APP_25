@@ -146,6 +146,22 @@ export async function enqueueEvent(args: {
  * Flush the queue to the cloud. Safe to call concurrently — only one flush
  * runs at a time. Removes successfully-stored events from the queue.
  */
+// Probe the kiosk with a short timeout. Returns true only when reachable —
+// when on Pi soft AP (no internet) the cloud POST will fail, but the kiosk
+// will respond. AbortController gives us a hard ~1.5s deadline since fetch
+// has no native timeout in React Native.
+async function isKioskReachable(): Promise<boolean> {
+  try {
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), 1500);
+    const res = await fetch(ANALYTICS.KIOSK_PROBE_URL, { method: 'GET', signal: ctl.signal });
+    clearTimeout(t);
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 export async function flushQueue(): Promise<void> {
   if (flushPromise) return flushPromise;
   flushPromise = (async () => {
@@ -155,40 +171,47 @@ export async function flushQueue(): Promise<void> {
 
       const net = await NetInfo.fetch();
       if (!net.isConnected) {
-        logger.info('[analytics] flush skipped — no internet');
+        logger.info('[analytics] flush skipped — no network');
         return;
       }
 
       // Send up to 100 events per batch to keep payloads small
       const batch = queue.slice(0, 100);
-      const body = JSON.stringify({
-        synced_at: new Date().toISOString(),
-        events: batch,
-      });
 
-      const res = await fetch(ANALYTICS.EVENTS_BATCH_URL, {
+      // Prefer kiosk relay when reachable (covers offline-LAN case where the
+      // device is on Pi soft AP without internet). Cloud fallback handles
+      // the off-Pi cellular case.
+      const useKiosk = await isKioskReachable();
+      const url = useKiosk ? ANALYTICS.KIOSK_QUEUE_URL : ANALYTICS.EVENTS_BATCH_URL;
+      const body = JSON.stringify(
+        useKiosk
+          ? { events: batch }
+          : { synced_at: new Date().toISOString(), events: batch },
+      );
+
+      const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body,
       });
 
       if (!res.ok && res.status !== 207) {
-        logger.error(`[analytics] flush HTTP ${res.status} — keeping events queued`);
+        logger.error(`[analytics] flush HTTP ${res.status} via ${useKiosk ? 'kiosk' : 'cloud'} — keeping events queued`);
         return;
       }
 
       const data = (await res.json().catch(() => null)) as
-        | { stored_events?: number; rejected_events?: number; errors?: { index: number }[] }
+        | { status?: boolean; queued?: number; stored_events?: number; rejected_events?: number; errors?: { index: number }[] }
         | null;
 
-      // If backend rejected specific events, keep only those still problematic
-      // and the events beyond the batch we attempted.
-      const rejectedIdxs = new Set((data?.errors || []).map((e) => e.index));
+      // Kiosk relay accepts blindly (it just appends to events.json). Cloud
+      // may reject individual events — preserve those.
+      const rejectedIdxs = useKiosk ? new Set<number>() : new Set((data?.errors || []).map((e) => e.index));
       const remaining = batch.filter((_, i) => rejectedIdxs.has(i)).concat(queue.slice(batch.length));
       await writeQueue(remaining);
       logger.info(
-        `[analytics] flushed: stored=${data?.stored_events ?? batch.length - rejectedIdxs.size}, ` +
-          `rejected=${rejectedIdxs.size}, remaining=${remaining.length}`,
+        `[analytics] flushed via ${useKiosk ? 'kiosk' : 'cloud'}: ` +
+          `attempted=${batch.length}, rejected=${rejectedIdxs.size}, remaining=${remaining.length}`,
       );
     } catch (err) {
       logger.error('[analytics] flush failed', err);
