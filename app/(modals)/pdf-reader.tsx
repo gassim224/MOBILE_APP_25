@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -41,13 +41,29 @@ export default function PdfReader() {
 
   const pdfRef = useRef<any>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  // initialPage is passed to <Pdf page={...} /> and MUST stay stable after the
+  // PDF mounts. If we kept feeding currentPage into the page prop, every
+  // onPageChanged → setState → re-render would issue a native jumpTo() that
+  // races with the rendering thread and crashes with
+  // "java.lang.IllegalStateException: Already closed" (pdfium PdfPage closed
+  // mid-render). See RenderingHandler.proceed in barteksc/AndroidPdfViewer.
+  const [initialPage, setInitialPage] = useState<number | null>(null);
   const [totalPages, setTotalPages] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [showHeader, setShowHeader] = useState(true);
   const hideHeaderTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Stable source identity — a fresh object literal on every render makes
+  // react-native-pdf treat the source as changed and recycle the document.
+  const pdfSource = useMemo(
+    () => ({ uri: pdfUrl || '', cache: true }),
+    [pdfUrl]
+  );
+
   useEffect(() => {
-    if (Platform.OS !== 'web') {
+    if (Platform.OS === 'web') {
+      setInitialPage(1);
+    } else {
       loadProgress();
     }
     // Analytics: emit content_accessed_offline on PDF open. Books are 'ebook',
@@ -105,15 +121,22 @@ export default function PdfReader() {
   }, [showHeader]);
 
   const loadProgress = async () => {
-    if (!itemId) return;
+    if (!itemId) {
+      setInitialPage(1);
+      return;
+    }
 
     try {
       const savedProgress = await progressStorage.getProgress(itemId);
-      if (savedProgress && savedProgress.type === 'pdf' && savedProgress.position > 0) {
-        setCurrentPage(savedProgress.position);
-      }
+      const start =
+        savedProgress && savedProgress.type === 'pdf' && savedProgress.position > 0
+          ? savedProgress.position
+          : 1;
+      setInitialPage(start);
+      setCurrentPage(start);
     } catch (error) {
       console.error('Error loading progress:', error);
+      setInitialPage(1);
     }
   };
 
@@ -279,11 +302,11 @@ export default function PdfReader() {
         activeOpacity={1}
         onPress={toggleHeader}
       >
-        {Pdf && (
+        {Pdf && initialPage !== null && (
           <Pdf
             ref={pdfRef}
-            source={{ uri: demoPdfUrl, cache: true }}
-            page={currentPage}
+            source={pdfSource}
+            page={initialPage}
             onLoadComplete={handleLoadComplete}
             onPageChanged={handlePageChanged}
             onError={handleError}
@@ -333,7 +356,9 @@ export default function PdfReader() {
                 style={[styles.navButton, styles.prevButton]}
                 onPress={() => {
                   if (pdfRef.current && currentPage > 1) {
-                    setCurrentPage(currentPage - 1);
+                    const target = currentPage - 1;
+                    pdfRef.current.setPage?.(target);
+                    setCurrentPage(target);
                   }
                 }}
                 activeOpacity={0.8}
@@ -347,7 +372,9 @@ export default function PdfReader() {
                 style={[styles.navButton, styles.nextButton]}
                 onPress={() => {
                   if (pdfRef.current && currentPage < totalPages) {
-                    setCurrentPage(currentPage + 1);
+                    const target = currentPage + 1;
+                    pdfRef.current.setPage?.(target);
+                    setCurrentPage(target);
                   }
                 }}
                 activeOpacity={0.8}
