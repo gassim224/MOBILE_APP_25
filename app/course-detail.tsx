@@ -23,14 +23,16 @@ import { StudentAPI, DownloadAPI, ApiVideo, ApiPdf, ApiPastPaper, compareLessons
 import { enqueueEvent, type ContentType } from "@/services/analyticsService";
 
 // Map a Lesson to its analytics content_type. PDFs that look like exercises
-// (annale/corrigé/exercice) count as 'exercise'; everything else is 'course'.
+// (annale/corrigé/exercice) count as 'exercise'; remaining PDF lessons are
+// 'pdf' (their own type per the metric-5 spec); video/audio lessons are 'course'.
 const lessonContentType = (lesson: Lesson): ContentType => {
   const isExercise =
     lesson.id.startsWith('exercise_') ||
     lesson.title.toLowerCase().includes('exercice') ||
     lesson.title.toLowerCase().includes('annale') ||
     lesson.title.toLowerCase().includes('corrigé');
-  return isExercise ? 'exercise' : 'course';
+  if (isExercise) return 'exercise';
+  return lesson.type === 'pdf' ? 'pdf' : 'course';
 };
 
 type TabType = 'lessons' | 'texts' | 'exercises';

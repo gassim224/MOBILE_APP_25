@@ -19,9 +19,14 @@ export const STORAGE_KEYS = {
   COURSE_PROGRESS_PREFIX: 'course_progress_',
   LESSON_REMINDER_PREFIX: 'lesson_reminder_',
   // Analytics events
+  // Once-emit flag prefixes carry a version suffix. Bumping the version
+  // invalidates all stale flags from prior builds so events can fire again
+  // for the same (user, content) pair — used to recover from earlier
+  // versions that set the flag without successfully enqueueing.
   ANALYTICS_EVENT_QUEUE: '@analytics_event_queue',
   ANALYTICS_FIRST_LOGIN_EMITTED_PREFIX: '@analytics_first_login_emitted_',
-  ANALYTICS_CONSUMED_EMITTED_PREFIX: '@analytics_consumed_emitted_',
+  ANALYTICS_CONSUMED_EMITTED_PREFIX: '@analytics_consumed_emitted_v2_',
+  ANALYTICS_EXERCISE_EMITTED_PREFIX: '@analytics_exercise_completed_v2_',
   // Teacher's currently selected grade (from their assigned list).
   // Students never read this — their grade is fixed on the JWT.
   ACTIVE_GRADE: '@active_grade',
@@ -38,8 +43,13 @@ export const ANALYTICS = {
   EVENTS_BATCH_URL: 'https://admin-api.bonecole.com/api/v1/events/batch',
   KIOSK_QUEUE_URL: 'http://10.42.0.1:8001/events/queue',
   KIOSK_PROBE_URL: 'http://10.42.0.1:8001/cloud/school/update',
-  // Lesson is considered "consumed" once playback / read passes this threshold
-  CONSUMED_THRESHOLD: 0.5,
+  // Strict completion per May 2026 product clarification:
+  //   - video / audio: user reaches >= 90% of duration
+  //   - pdf / ebook : last page reached (handled separately in pdf-reader)
+  //   - exercise    : last page reached (handled separately in pdf-reader)
+  // This threshold is used by video/audio players only. PDF logic fires on
+  // last-page-reached, not on a ratio.
+  CONSUMED_THRESHOLD: 0.9,
 } as const;
 
 // Time Intervals

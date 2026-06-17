@@ -160,7 +160,8 @@ export default function Bibliotheque() {
           content_id: book.id,
           content_type: 'ebook',
           content_title: book.title,
-          // Books don't carry a subject in the data model; leave undefined
+          // Books carry no curriculum subject; enqueueEvent tags ebooks with
+          // the fixed pseudo-subject 'Bibliothèque'
         },
       }).catch((e) => logger.error('analytics enqueue failed', e));
 

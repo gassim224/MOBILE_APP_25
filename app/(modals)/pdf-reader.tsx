@@ -14,7 +14,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { progressStorage, MediaProgress } from '@/utils/progressStorage';
 import { scheduleLessonContinuationReminder, cancelLessonContinuationReminder } from '@/utils/notificationService';
-import { emitContentAccessed, emitContentConsumedOnce, emitExerciseCompletedOnce } from '@/services/analyticsService';
+import { emitContentAccessed, emitContentConsumedOnce, emitExerciseCompletedOnce, type ContentType } from '@/services/analyticsService';
 import { useConnectionSimulator } from '@/contexts/ConnectionSimulatorContext';
 import { useDownloads } from '@/contexts/DownloadsContext';
 import { ANALYTICS } from '@/constants/AppConstants';
@@ -39,8 +39,21 @@ export default function PdfReader() {
     itemType?: 'book' | 'lesson';
   }>();
 
+  // Classify the document once. Books are 'ebook'; past papers come through
+  // with id `exercise_*` (see course-detail.tsx mapPastPaperToLesson), title
+  // keywords are the fallback for exercise PDFs that aren't past papers.
+  // Remaining lesson PDFs are 'pdf' — their own content type per the
+  // metric-5 spec, not 'course' (course = video/audio lessons).
+  const isBook = itemType === 'book';
+  const isExercise =
+    !isBook &&
+    !!itemId &&
+    (itemId.startsWith('exercise_') || /exerc|annale|corrig/i.test(itemTitle || ''));
+  const contentType: ContentType = isBook ? 'ebook' : isExercise ? 'exercise' : 'pdf';
+
   const pdfRef = useRef<any>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [markedComplete, setMarkedComplete] = useState(false);
   // initialPage is passed to <Pdf page={...} /> and MUST stay stable after the
   // PDF mounts. If we kept feeding currentPage into the page prop, every
   // onPageChanged → setState → re-render would issue a native jumpTo() that
@@ -66,20 +79,12 @@ export default function PdfReader() {
     } else {
       loadProgress();
     }
-    // Analytics: emit content_accessed_offline on PDF open. Books are 'ebook',
-    // lessons are 'course' or 'exercise'. Past papers come through with
-    // id `exercise_paper_*` (see course-detail.tsx mapPastPaperToLesson) — that
-    // is the structural signal. Title keyword check stays as a fallback for
-    // exercise PDFs that aren't past-papers but happen to be named after one.
+    // Analytics: emit content_accessed_offline on PDF open.
     if (itemId && itemTitle) {
-      const isBook = itemType === 'book';
-      const isExercise =
-        !isBook &&
-        (itemId.startsWith('exercise_') || /exerc|annale|corrig/i.test(itemTitle));
       emitContentAccessed({
         lessonId: itemId,
         lessonTitle: itemTitle,
-        contentType: isBook ? 'ebook' : isExercise ? 'exercise' : 'course',
+        contentType,
         offline: !isConnectedToKiosk,
       }).catch(() => undefined);
 
@@ -162,34 +167,24 @@ export default function PdfReader() {
     setTotalPages(numberOfPages);
     saveProgress(page);
 
-    // Analytics: fire content_consumed once when reader passes 50% of pages.
-    // Skip for books — gassim said no consumption tracking for ebooks.
-    if (itemId && itemTitle && itemType !== 'book' && numberOfPages > 0) {
-      const isExercise =
-        itemId.startsWith('exercise_') || /exerc|annale|corrig/i.test(itemTitle);
-      const ratio = page / numberOfPages;
-      if (ratio >= ANALYTICS.CONSUMED_THRESHOLD) {
-        // Mark the lesson complete locally so the per-course progress bar updates.
-        markLessonCompleteByLessonId(itemId).catch(() => undefined);
-        emitContentConsumedOnce({
-          offline: !isConnectedToKiosk,
-          content: {
-            content_id: itemId,
-            content_type: isExercise ? 'exercise' : 'course',
-            content_title: itemTitle,
-          },
-        }).catch(() => undefined);
-      }
-    }
+    // Analytics: per May 2026 clarification, PDF / ebook / exercise content
+    // is "consumed" when the user reaches the LAST page (not a ratio). Ebooks
+    // are now included — the previous "no consumption for ebooks" rule was
+    // superseded by the May spec.
+    if (page === numberOfPages && itemId && itemTitle && numberOfPages > 0) {
+      setMarkedComplete(true);
+      // Mark lesson complete locally so the per-course progress bar updates.
+      // Idempotent — no-op for ebooks (no course linkage).
+      markLessonCompleteByLessonId(itemId).catch(() => undefined);
+      emitContentConsumedOnce({
+        offline: !isConnectedToKiosk,
+        content: { content_id: itemId, content_type: contentType, content_title: itemTitle },
+      }).catch(() => undefined);
 
-    // If user reached the last page, cancel continuation reminder
-    if (page === numberOfPages && itemId) {
       cancelLessonContinuationReminder(itemId);
-      // Analytics: an exercise PDF completed end-to-end fires exercises_completed
-      const isExercise =
-        itemType !== 'book' &&
-        (itemId.startsWith('exercise_') || /exerc|annale|corrig/i.test(itemTitle || ''));
-      if (isExercise && itemTitle) {
+
+      // Exercises also fire exercises_completed (separate event, dedup'd).
+      if (isExercise) {
         emitExerciseCompletedOnce({
           offline: !isConnectedToKiosk,
           content: { content_id: itemId, content_type: 'exercise', content_title: itemTitle },
@@ -217,12 +212,26 @@ export default function PdfReader() {
     );
   };
 
+  // Explicit completion, per the metric-5 spec: "pdf lesson or ebook — user
+  // reaches the last page OR explicitly marks the content as completed".
+  // Exercises complete only by reaching the last page, so they don't get this.
+  const handleMarkComplete = () => {
+    if (!itemId || !itemTitle) return;
+    setMarkedComplete(true);
+    markLessonCompleteByLessonId(itemId).catch(() => undefined);
+    emitContentConsumedOnce({
+      offline: !isConnectedToKiosk,
+      content: { content_id: itemId, content_type: contentType, content_title: itemTitle },
+    }).catch(() => undefined);
+    cancelLessonContinuationReminder(itemId);
+  };
+
   const handleClose = async () => {
     if (Platform.OS !== 'web') {
       await saveProgress(currentPage);
 
       // If PDF was not completed (current page < 90% of total pages), schedule continuation reminder
-      if (itemId && itemTitle && totalPages > 0 && currentPage < totalPages * 0.9) {
+      if (itemId && itemTitle && totalPages > 0 && currentPage < totalPages * 0.9 && !markedComplete) {
         await scheduleLessonContinuationReminder(itemId, itemTitle);
       }
     }
@@ -344,6 +353,23 @@ export default function PdfReader() {
                   Page {currentPage} sur {totalPages}
                 </Text>
               </View>
+              {!isExercise && (
+                <TouchableOpacity
+                  style={[styles.completeButton, markedComplete && styles.completeButtonDone]}
+                  onPress={handleMarkComplete}
+                  disabled={markedComplete}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons
+                    name={markedComplete ? 'checkmark-circle' : 'checkmark-circle-outline'}
+                    size={20}
+                    color={markedComplete ? '#1E3A5F' : '#FFD700'}
+                  />
+                  <Text style={[styles.completeButtonText, markedComplete && styles.completeButtonTextDone]}>
+                    {markedComplete ? 'Terminé' : 'Terminer'}
+                  </Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         )}
@@ -456,6 +482,28 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.8)',
     fontSize: 14,
     fontWeight: '600',
+  },
+  completeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#FFD700',
+    marginLeft: 12,
+  },
+  completeButtonDone: {
+    backgroundColor: '#FFD700',
+  },
+  completeButtonText: {
+    color: '#FFD700',
+    fontSize: 14,
+    fontWeight: '700',
+    marginLeft: 6,
+  },
+  completeButtonTextDone: {
+    color: '#1E3A5F',
   },
   navigationOverlay: {
     position: 'absolute',

@@ -174,10 +174,12 @@ export default function AudioPlayer() {
       saveProgress();
     }
 
-    // Analytics: fire content_consumed once when playback crosses the threshold
+    // Analytics: fire content_consumed once when playback crosses the threshold.
+    // Skip when audioUrl is empty — playback then falls back to the demo track,
+    // which must not count as consuming the lesson.
     const dur = status.durationMillis || 0;
     const pos = status.positionMillis || 0;
-    if (lessonId && lessonTitle && dur > 0 && pos / dur >= ANALYTICS.CONSUMED_THRESHOLD) {
+    if (lessonId && lessonTitle && audioUrl?.trim() && dur > 0 && pos / dur >= ANALYTICS.CONSUMED_THRESHOLD) {
       emitContentConsumedOnce({
         offline: !isConnectedToKiosk,
         content: { content_id: lessonId, content_type: 'course', content_title: lessonTitle },

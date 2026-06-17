@@ -499,6 +499,19 @@ export function compareLessonsByPrefix(a: string, b: string): number {
 // Student API. The `grade` parameter is optional; supply it for teachers who
 // have multiple assigned grades. The mobile screens read this from
 // ActiveGradeContext (or getActiveGradeForApi).
+// Stable content id derived from grade + subject + file path. Positional
+// indexes (paper_0, paper_1…) collide across subjects and shift whenever the
+// kiosk adds or removes a file, which corrupts per-content analytics
+// (distinct user/content pairs), the consumed-once dedup flags, and saved
+// reading/playback progress. The path is the kiosk's unique key; hash it so
+// the id stays short enough for the events table's 64-char content_id column.
+function stableContentId(prefix: string, subjectName: string, grade: string | null | undefined, path: string): string {
+  const input = `${grade || ''}|${subjectName}|${path}`;
+  let h = 5381;
+  for (let i = 0; i < input.length; i++) h = ((h << 5) + h + input.charCodeAt(i)) >>> 0;
+  return `${prefix}_${h.toString(36)}`;
+}
+
 export const StudentAPI = {
   /**
    * Get home screen data
@@ -552,8 +565,7 @@ export const StudentAPI = {
     if (rawResponse.status && rawResponse.data) {
       // Flatten the chapter-grouped videos into a single array
       const videos: ApiVideo[] = [];
-      let videoIndex = 0;
-      
+
       for (const [chapter, chapterVideos] of Object.entries(rawResponse.data)) {
         if (Array.isArray(chapterVideos)) {
           for (const video of chapterVideos) {
@@ -566,7 +578,7 @@ export const StudentAPI = {
             }
             
             videos.push({
-              id: `video_${videoIndex++}`,
+              id: stableContentId('video', subjectName, grade, video.path),
               title: video.name,
               filename: video.path,
               duration: durationStr,
@@ -606,8 +618,8 @@ export const StudentAPI = {
     logger.info('PDFs API raw response:', JSON.stringify(rawResponse));
     
     if (rawResponse.status && rawResponse.data) {
-      const pdfs: ApiPdf[] = rawResponse.data.map((pdf, index) => ({
-        id: `pdf_${index}`,
+      const pdfs: ApiPdf[] = rawResponse.data.map((pdf) => ({
+        id: stableContentId('pdf', subjectName, grade, pdf.path),
         title: pdf.name,
         filename: pdf.path,
         sizeBytes: pdf.size,
@@ -638,8 +650,8 @@ export const StudentAPI = {
     logger.info('Past Papers API raw response:', JSON.stringify(rawResponse));
     
     if (rawResponse.status && rawResponse.data) {
-      const pastPapers: ApiPastPaper[] = rawResponse.data.map((paper, index) => ({
-        id: `paper_${index}`,
+      const pastPapers: ApiPastPaper[] = rawResponse.data.map((paper) => ({
+        id: stableContentId('paper', subjectName, grade, paper.path),
         title: paper.name,
         filename: paper.path,
         sizeBytes: paper.size,

@@ -35,7 +35,10 @@ const CONTENT_EVENTS: ReadonlySet<EventName> = new Set<EventName>([
   'ebook_downloaded',
 ]);
 
-export type ContentType = 'course' | 'ebook' | 'exercise';
+// `pdf` added per May 2026 product clarification — it covers standalone
+// PDF lessons (annales, fiches) that aren't structurally part of a course.
+// Backend filter accepts: course | exercise | ebook | pdf.
+export type ContentType = 'course' | 'ebook' | 'exercise' | 'pdf';
 
 export interface ContentEventInput {
   content_id: string;
@@ -126,7 +129,10 @@ export async function enqueueEvent(args: {
       ? {
           content_id: args.content.content_id,
           content_type: args.content.content_type,
-          subject: args.content.subject,
+          // Library books have no curriculum subject in the kiosk data model;
+          // tag them with the fixed pseudo-subject so the dashboard's subject
+          // filter can see ebook events instead of silently dropping them.
+          subject: args.content.subject ?? (args.content.content_type === 'ebook' ? 'Bibliothèque' : undefined),
           content_title: args.content.content_title,
           grade_level: args.content.grade_level || activeGrade,
         }
@@ -314,14 +320,27 @@ export async function emitContentConsumedOnce(args: {
   content: ContentEventInput;
 }): Promise<void> {
   const user = await getCurrentUser();
-  if (!user || !user.id) return;
+  if (!user || !user.id) {
+    logger.error('[analytics] content_consumed skipped — user not loaded', { content_id: args.content.content_id });
+    return;
+  }
 
   const flagKey = `${STORAGE_KEYS.ANALYTICS_CONSUMED_EMITTED_PREFIX}${user.id}_${args.content.content_id}`;
   const already = await AsyncStorage.getItem(flagKey);
-  if (already) return;
+  if (already) {
+    logger.info(`[analytics] content_consumed already emitted for ${args.content.content_id}`);
+    return;
+  }
 
-  await enqueueEvent({ event_name: 'content_consumed', offline: args.offline, content: args.content });
+  // Players don't know the parent course; resolve subject the same way
+  // content_accessed_offline does, so the dashboard's subject filter matches
+  // consumed events against their download/access counterparts.
+  const subject = args.content.subject ?? (await findParentCourse(args.content.content_id))?.title;
+  await enqueueEvent({ event_name: 'content_consumed', offline: args.offline, content: { ...args.content, subject } });
+  // Only set the flag AFTER the enqueue resolves. If enqueueEvent threw,
+  // we never reach this line and the next playback can retry.
   await AsyncStorage.setItem(flagKey, '1');
+  logger.info(`[analytics] content_consumed emitted for ${args.content.content_id}`);
 }
 
 /**
@@ -333,16 +352,24 @@ export async function emitExerciseCompletedOnce(args: {
   content: ContentEventInput;
 }): Promise<void> {
   const user = await getCurrentUser();
-  if (!user || !user.id) return;
+  if (!user || !user.id) {
+    logger.error('[analytics] exercises_completed skipped — user not loaded', { content_id: args.content.content_id });
+    return;
+  }
 
-  const flagKey = `@analytics_exercise_completed_${user.id}_${args.content.content_id}`;
+  const flagKey = `${STORAGE_KEYS.ANALYTICS_EXERCISE_EMITTED_PREFIX}${user.id}_${args.content.content_id}`;
   const already = await AsyncStorage.getItem(flagKey);
-  if (already) return;
+  if (already) {
+    logger.info(`[analytics] exercises_completed already emitted for ${args.content.content_id}`);
+    return;
+  }
 
+  const subject = args.content.subject ?? (await findParentCourse(args.content.content_id))?.title;
   await enqueueEvent({
     event_name: 'exercises_completed',
     offline: args.offline,
-    content: { ...args.content, content_type: 'exercise' },
+    content: { ...args.content, content_type: 'exercise', subject },
   });
   await AsyncStorage.setItem(flagKey, '1');
+  logger.info(`[analytics] exercises_completed emitted for ${args.content.content_id}`);
 }
