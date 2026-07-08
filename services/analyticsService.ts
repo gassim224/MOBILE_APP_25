@@ -16,6 +16,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import { ANALYTICS, STORAGE_KEYS } from '@/constants/AppConstants';
 import { getActiveGradeForApi } from '@/contexts/ActiveGradeContext';
+import { recordLearningActivity } from '@/utils/learningHistory';
 import logger from '@/utils/Logger';
 import type { UserProfile } from '@/types';
 
@@ -143,6 +144,26 @@ export async function enqueueEvent(args: {
   queue.push(event);
   await writeQueue(queue);
   logger.info(`[analytics] enqueued ${args.event_name}; queue size: ${queue.length}`);
+
+  // Mirror the event into the local lifetime history so profile statistics
+  // survive content deletion (deletion flows never touch that store).
+  if (args.content) {
+    const historyAction =
+      args.event_name === 'content_downloaded' || args.event_name === 'ebook_downloaded'
+        ? 'downloaded'
+        : args.event_name === 'content_consumed'
+          ? 'completed'
+          : null;
+    if (historyAction) {
+      recordLearningActivity(user.id, {
+        action: historyAction,
+        content_id: args.content.content_id,
+        title: args.content.content_title,
+        type: args.content.content_type,
+        subject: event.subject,
+      }).catch(() => undefined);
+    }
+  }
 
   // Try to flush in the background — don't await, don't fail caller
   flushQueue().catch((e) => logger.error('[analytics] background flush failed', e));

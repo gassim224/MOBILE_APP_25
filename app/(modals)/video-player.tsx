@@ -18,6 +18,7 @@ import * as ScreenOrientation from 'expo-screen-orientation';
 import { progressStorage, MediaProgress } from '@/utils/progressStorage';
 import { scheduleLessonContinuationReminder, cancelLessonContinuationReminder } from '@/utils/notificationService';
 import { emitContentAccessed, emitContentConsumedOnce } from '@/services/analyticsService';
+import { addStudyTime } from '@/utils/studyTime';
 import { useConnectionSimulator } from '@/contexts/ConnectionSimulatorContext';
 import { useDownloads } from '@/contexts/DownloadsContext';
 import { ANALYTICS } from '@/constants/AppConstants';
@@ -34,7 +35,19 @@ export default function VideoPlayer() {
   const videoUrl = Array.isArray(params.videoUrl) ? params.videoUrl[0] : params.videoUrl;
 
   const videoRef = useRef<Video>(null);
+  // Study-time accumulator: wall-clock while playback is running.
+  const playStartRef = useRef<number | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+
+  // Flush any in-progress study-time span when the player closes.
+  useEffect(() => {
+    return () => {
+      if (playStartRef.current !== null) {
+        addStudyTime(Date.now() - playStartRef.current).catch(() => undefined);
+        playStartRef.current = null;
+      }
+    };
+  }, []);
   const [isLoading, setIsLoading] = useState(true);
   const [showControls, setShowControls] = useState(true);
   const [position, setPosition] = useState(0);
@@ -163,6 +176,14 @@ export default function VideoPlayer() {
     setIsPlaying(status.isPlaying);
     setPosition(status.positionMillis || 0);
     setDuration(status.durationMillis || 0);
+
+    // Accumulate study time across play/pause transitions
+    if (status.isPlaying && playStartRef.current === null) {
+      playStartRef.current = Date.now();
+    } else if (!status.isPlaying && playStartRef.current !== null) {
+      addStudyTime(Date.now() - playStartRef.current).catch(() => undefined);
+      playStartRef.current = null;
+    }
 
     // Save progress periodically (every 5 seconds of playback)
     if (status.isPlaying && Math.floor((status.positionMillis || 0) / 5000) % 1 === 0) {

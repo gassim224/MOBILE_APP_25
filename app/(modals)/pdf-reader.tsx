@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Platform,
   Alert,
+  AppState,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -15,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { progressStorage, MediaProgress } from '@/utils/progressStorage';
 import { scheduleLessonContinuationReminder, cancelLessonContinuationReminder } from '@/utils/notificationService';
 import { emitContentAccessed, emitContentConsumedOnce, emitExerciseCompletedOnce, type ContentType } from '@/services/analyticsService';
+import { addStudyTime } from '@/utils/studyTime';
 import { useConnectionSimulator } from '@/contexts/ConnectionSimulatorContext';
 import { useDownloads } from '@/contexts/DownloadsContext';
 import { ANALYTICS } from '@/constants/AppConstants';
@@ -54,6 +56,29 @@ export default function PdfReader() {
   const pdfRef = useRef<any>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [markedComplete, setMarkedComplete] = useState(false);
+
+  // Study-time accumulator: reading time from open to close, paused while
+  // the app is in the background.
+  const readStartRef = useRef<number | null>(Date.now());
+  useEffect(() => {
+    const flushReadingSpan = () => {
+      if (readStartRef.current !== null) {
+        addStudyTime(Date.now() - readStartRef.current).catch(() => undefined);
+        readStartRef.current = null;
+      }
+    };
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        readStartRef.current = Date.now();
+      } else {
+        flushReadingSpan();
+      }
+    });
+    return () => {
+      sub.remove();
+      flushReadingSpan();
+    };
+  }, []);
   // initialPage is passed to <Pdf page={...} /> and MUST stay stable after the
   // PDF mounts. If we kept feeding currentPage into the page prop, every
   // onPageChanged → setState → re-render would issue a native jumpTo() that

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -8,12 +8,14 @@ import {
   Alert,
   Animated,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useConnectionSimulator } from "@/contexts/ConnectionSimulatorContext";
 import { useDownloads } from "@/contexts/DownloadsContext";
+import { seedLearningHistoryIfNeeded } from "@/utils/learningHistory";
+import { getStudyTimeMs, formatStudyTime } from "@/utils/studyTime";
 import logger from "@/utils/Logger";
 // Use the central UserProfile type — it includes the role + teacher metadata
 // (subjects, gradeLevels) needed for teacher-aware profile rendering.
@@ -28,33 +30,46 @@ export default function Profile() {
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const previousConnectionState = useRef(isConnectedToKiosk);
 
-  // Compute real user statistics from downloaded data
-  const stats = useMemo(() => {
-    const coursesStarted = downloadedCourses.length;
-    const completedLessons = downloadedCourses.reduce(
-      (sum, course) => sum + course.lessons.filter((l) => l.isCompleted).length,
-      0
-    );
-    const booksRead = downloadedBooks.length;
+  // Lifetime statistics from the learning-history store — unlike the old
+  // downloads-derived numbers, these survive content deletion. Study time is
+  // the real accumulated player/reader time, not an estimate.
+  const [stats, setStats] = useState({
+    coursesStarted: 0,
+    completedLessons: 0,
+    studyTimeLabel: '0min',
+    booksRead: 0,
+  });
 
-    // Estimate study time from completed lesson durations
-    const studyMinutes = downloadedCourses.reduce((sum, course) => {
-      return sum + course.lessons
-        .filter((l) => l.isCompleted)
-        .reduce((s, l) => {
-          const match = l.duration?.match(/(\d+)\s*min/i);
-          return s + (match ? parseInt(match[1], 10) : 0);
-        }, 0);
-    }, 0);
-    const studyHours = Math.floor(studyMinutes / 60);
-    const studyTimeLabel = studyMinutes === 0
-      ? '0h'
-      : studyHours > 0
-        ? `${studyHours}h${studyMinutes % 60 > 0 ? (studyMinutes % 60) + 'min' : ''}`
-        : `${studyMinutes}min`;
+  const refreshStats = useCallback(async () => {
+    if (!userProfile?.id) return;
+    try {
+      const history = await seedLearningHistoryIfNeeded(userProfile.id, {
+        courses: downloadedCourses.map((c) => ({ title: c.title, lessons: c.lessons })),
+        books: downloadedBooks.map((b) => ({ id: b.id })),
+      });
+      const studyMs = await getStudyTimeMs();
+      setStats({
+        coursesStarted: history.courseTitles.length,
+        completedLessons: history.lessonsCompleted,
+        booksRead: history.booksRead,
+        studyTimeLabel: formatStudyTime(studyMs),
+      });
+    } catch (error) {
+      logger.error("Error loading learning history:", error);
+    }
+  }, [userProfile, downloadedCourses, downloadedBooks]);
 
-    return { coursesStarted, completedLessons, studyTimeLabel, booksRead };
-  }, [downloadedCourses, downloadedBooks]);
+  useEffect(() => {
+    refreshStats();
+  }, [refreshStats]);
+
+  // Refresh when the tab regains focus so time spent in a player just now
+  // shows up immediately.
+  useFocusEffect(
+    useCallback(() => {
+      refreshStats();
+    }, [refreshStats])
+  );
 
   const loadUserProfile = useCallback(async () => {
     try {

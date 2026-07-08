@@ -19,6 +19,7 @@ import { STORAGE_KEYS } from '@/constants/AppConstants';
 import { progressStorage, MediaProgress } from '@/utils/progressStorage';
 import { scheduleLessonContinuationReminder, cancelLessonContinuationReminder } from '@/utils/notificationService';
 import { emitContentAccessed, emitContentConsumedOnce } from '@/services/analyticsService';
+import { addStudyTime } from '@/utils/studyTime';
 import { useConnectionSimulator } from '@/contexts/ConnectionSimulatorContext';
 import { useDownloads } from '@/contexts/DownloadsContext';
 import { ANALYTICS } from '@/constants/AppConstants';
@@ -34,6 +35,18 @@ export default function AudioPlayer() {
   }>();
 
   const soundRef = useRef<Audio.Sound | null>(null);
+  // Study-time accumulator: wall-clock while playback is running.
+  const playStartRef = useRef<number | null>(null);
+
+  // Flush any in-progress study-time span when the player closes.
+  useEffect(() => {
+    return () => {
+      if (playStartRef.current !== null) {
+        addStudyTime(Date.now() - playStartRef.current).catch(() => undefined);
+        playStartRef.current = null;
+      }
+    };
+  }, []);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [position, setPosition] = useState(0);
@@ -168,6 +181,14 @@ export default function AudioPlayer() {
     setIsPlaying(status.isPlaying);
     setPosition(status.positionMillis || 0);
     setDuration(status.durationMillis || 0);
+
+    // Accumulate study time across play/pause transitions
+    if (status.isPlaying && playStartRef.current === null) {
+      playStartRef.current = Date.now();
+    } else if (!status.isPlaying && playStartRef.current !== null) {
+      addStudyTime(Date.now() - playStartRef.current).catch(() => undefined);
+      playStartRef.current = null;
+    }
 
     // Save progress periodically
     if (status.isPlaying && Math.floor((status.positionMillis || 0) / 5000) % 1 === 0) {
