@@ -20,6 +20,7 @@ import { UserProfile } from "@/types";
 import logger from "@/utils/Logger";
 import { AuthAPI, ApiError } from "@/services/api";
 import { emitFirstLoginIfNew } from "@/services/analyticsService";
+import { isDemoLogin, seedDemoAccount } from "@/utils/demoMode";
 import { useActiveGrade } from "@/contexts/ActiveGradeContext";
 
 // Persisted across logouts so a user who logged out while offline can sign
@@ -49,6 +50,30 @@ export default function Login() {
 
     setLoading(true);
     setIsNavigating(true);
+
+    // Store-review demo account: fully local, no kiosk required. Seeds
+    // bundled sample content so reviewers can exercise every feature.
+    if (isDemoLogin(studentId, password)) {
+      try {
+        const profile = await seedDemoAccount();
+        // Persist for offline relogin like a normal account, so logging out
+        // and back in during the review also works.
+        await AsyncStorage.setItem(OFFLINE_PROFILE_KEY, JSON.stringify({
+          email: studentId.trim(),
+          password: password.trim(),
+          profile,
+        }));
+        await refreshActiveGrade();
+        setTimeout(() => router.replace("/(tabs)"), 100);
+      } catch (error) {
+        logger.error("Demo login failed:", error);
+        Alert.alert("Erreur", "Une erreur s'est produite. Veuillez réessayer.", [{ text: MESSAGES.OK }]);
+        setIsNavigating(false);
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
 
     // Offline relogin: if kiosk is unreachable but we have a cached profile +
     // saved password for this email, let the user back in to their downloads.

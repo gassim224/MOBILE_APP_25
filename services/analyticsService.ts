@@ -16,6 +16,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import { ANALYTICS, STORAGE_KEYS } from '@/constants/AppConstants';
 import { getActiveGradeForApi } from '@/contexts/ActiveGradeContext';
+import { DEMO_SCHOOL_ID } from '@/utils/demoMode';
 import { recordLearningActivity } from '@/utils/learningHistory';
 import logger from '@/utils/Logger';
 import type { UserProfile } from '@/types';
@@ -106,6 +107,13 @@ export async function enqueueEvent(args: {
   const user = await getCurrentUser();
   if (!user || !user.id || !user.schoolId) {
     logger.error('[analytics] cannot enqueue event — user not loaded', { event: args.event_name });
+    return;
+  }
+
+  // Store-review demo account: its activity must never reach the pilot
+  // metrics (also keeps it out of the local learning history, which is fine
+  // — the demo profile page still shows the seeded content stats).
+  if (user.schoolId === DEMO_SCHOOL_ID) {
     return;
   }
 
