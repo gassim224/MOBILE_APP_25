@@ -22,6 +22,7 @@ import { AuthAPI, ApiError } from "@/services/api";
 import { emitFirstLoginIfNew } from "@/services/analyticsService";
 import { isDemoLogin, seedDemoAccount, DEMO_SESSION_TOKEN } from "@/utils/demoMode";
 import { useActiveGrade } from "@/contexts/ActiveGradeContext";
+import { useDownloads } from "@/contexts/DownloadsContext";
 
 // Persisted across logouts so a user who logged out while offline can sign
 // back in to their downloads. Cleared by an explicit "forget device" action
@@ -32,6 +33,7 @@ const OFFLINE_PROFILE_KEY = '@offline_profile';
 export default function Login() {
   const router = useRouter();
   const { refresh: refreshActiveGrade } = useActiveGrade();
+  const { reloadDownloads } = useDownloads();
   const [studentId, setStudentId] = useState<string>("");
   const [password, setPassword] = useState<string>("");
   const [loading, setLoading] = useState(false);
@@ -64,6 +66,9 @@ export default function Login() {
           profile,
           token: DEMO_SESSION_TOKEN,
         }));
+        // The provider loaded (an empty) @downloads at app start; re-read so
+        // the seeded demo content is visible without an app restart.
+        await reloadDownloads();
         await refreshActiveGrade();
         setTimeout(() => router.replace("/(tabs)"), 100);
       } catch (error) {
@@ -187,7 +192,7 @@ export default function Login() {
     } finally {
       setLoading(false);
     }
-  }, [studentId, password, loading, isNavigating, router]);
+  }, [studentId, password, loading, isNavigating, router, reloadDownloads, refreshActiveGrade]);
 
   const handleSkipToDownloads = useCallback(() => {
     // Prevent navigation if already navigating

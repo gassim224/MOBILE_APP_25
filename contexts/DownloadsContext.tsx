@@ -19,6 +19,10 @@ interface DownloadsContextType {
    *  Used by player screens (video/audio/pdf) which only know the lessonId. */
   markLessonCompleteByLessonId: (lessonId: string) => Promise<void>;
   clearAllDownloads: () => Promise<void>;
+  /** Re-read the persisted downloads into state. Needed when something
+   *  outside the context writes the storage key directly (demo-mode seeding
+   *  at login) — the provider loads once on mount and would never see it. */
+  reloadDownloads: () => Promise<void>;
   isLoading: boolean;
 }
 
@@ -254,6 +258,7 @@ export const DownloadsProvider = ({ children }: { children: ReactNode }) => {
         updateCourseProgress,
         markLessonCompleteByLessonId,
         clearAllDownloads,
+        reloadDownloads: loadDownloads,
         isLoading,
       }}
     >
