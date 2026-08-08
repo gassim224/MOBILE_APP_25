@@ -20,7 +20,7 @@ import { UserProfile } from "@/types";
 import logger from "@/utils/Logger";
 import { AuthAPI, ApiError } from "@/services/api";
 import { emitFirstLoginIfNew } from "@/services/analyticsService";
-import { isDemoLogin, seedDemoAccount } from "@/utils/demoMode";
+import { isDemoLogin, seedDemoAccount, DEMO_SESSION_TOKEN } from "@/utils/demoMode";
 import { useActiveGrade } from "@/contexts/ActiveGradeContext";
 
 // Persisted across logouts so a user who logged out while offline can sign
@@ -62,6 +62,7 @@ export default function Login() {
           email: studentId.trim(),
           password: password.trim(),
           profile,
+          token: DEMO_SESSION_TOKEN,
         }));
         await refreshActiveGrade();
         setTimeout(() => router.replace("/(tabs)"), 100);

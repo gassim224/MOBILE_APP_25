@@ -22,6 +22,10 @@ import logger from '@/utils/Logger';
 // Connect ("App access" declarations).
 export const DEMO_CREDENTIALS = { id: 'eleve1', password: '123456' } as const;
 export const DEMO_SCHOOL_ID = 'DEMO';
+// The root layout's auth guard (app/_layout.tsx) bounces any route in the
+// (tabs) group back to /login when SESSION_TOKEN is missing — the demo
+// session needs a token like any other login.
+export const DEMO_SESSION_TOKEN = 'demo-session-token';
 
 // Same key DownloadsContext persists under.
 const DOWNLOADS_STORAGE_KEY = '@downloads';
@@ -72,6 +76,7 @@ async function materializeAsset(moduleRef: number, filename: string): Promise<st
 export async function seedDemoAccount(): Promise<UserProfile> {
   const profile = buildDemoProfile();
   await AsyncStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(profile));
+  await AsyncStorage.setItem(STORAGE_KEYS.SESSION_TOKEN, DEMO_SESSION_TOKEN);
 
   const raw = await AsyncStorage.getItem(DOWNLOADS_STORAGE_KEY);
   const existing = raw
