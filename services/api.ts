@@ -9,8 +9,11 @@ import logger from '@/utils/Logger';
 
 // API Configuration - Hardcoded for production builds
 // Note: Expo env variables are embedded at build time, but we hardcode for reliability
-const API_BASE_URL = 'http://10.42.0.1:8001/user';
-const CLOUD_BASE_URL = 'http://10.42.0.1:8001/cloud';
+// const API_BASE_URL = 'http://10.42.0.1:8001/user';
+// const CLOUD_BASE_URL = 'http://10.42.0.1:8001/cloud';
+
+const API_BASE_URL = 'http://bonecole.local/user'; // Use mDNS for local network access
+const CLOUD_BASE_URL = 'http://bonecole.local/cloud';
 
 // API Response Types
 // Actual Login API response format. Role / Subjects / GradeLevels are present

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The app talks to an offline Raspberry Pi kiosk on the local network over
+  plain HTTP (no public CA can issue a cert for a .local mDNS hostname).
+  Cleartext is permitted ONLY for that host; everything else stays HTTPS-only.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">bonecole.local</domain>
+    </domain-config>
+</network-security-config>
