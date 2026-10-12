@@ -84,6 +84,24 @@ async function writeQueue(events: AnalyticsEvent[]): Promise<void> {
   await AsyncStorage.setItem(STORAGE_KEYS.ANALYTICS_EVENT_QUEUE, JSON.stringify(events));
 }
 
+// Every change to the queue is a read-modify-write on one AsyncStorage key.
+// Two of them running at the same time (the PDF reader fires
+// content_accessed_offline and exercises_completed back to back, and a
+// flush may be finishing in between) lose whichever wrote first. This
+// serialises them, so a change always starts from the latest queue.
+let queueLock: Promise<unknown> = Promise.resolve();
+function withQueue<T>(fn: (queue: AnalyticsEvent[]) => Promise<{ queue: AnalyticsEvent[]; result: T }>): Promise<T> {
+  const run = queueLock.then(async () => {
+    const current = await readQueue();
+    const { queue, result } = await fn(current);
+    await writeQueue(queue);
+    return result;
+  });
+  // Keep the chain alive even when a step fails.
+  queueLock = run.catch(() => undefined);
+  return run;
+}
+
 async function getCurrentUser(): Promise<UserProfile | null> {
   try {
     const raw = await AsyncStorage.getItem(STORAGE_KEYS.USER_PROFILE);
@@ -148,10 +166,8 @@ export async function enqueueEvent(args: {
       : {}),
   };
 
-  const queue = await readQueue();
-  queue.push(event);
-  await writeQueue(queue);
-  logger.info(`[analytics] enqueued ${args.event_name}; queue size: ${queue.length}`);
+  const size = await withQueue(async (queue) => ({ queue: [...queue, event], result: queue.length + 1 }));
+  logger.info(`[analytics] enqueued ${args.event_name}; queue size: ${size}`);
 
   // Mirror the event into the local lifetime history so profile statistics
   // survive content deletion (deletion flows never touch that store).
@@ -197,17 +213,17 @@ async function isKioskReachable(): Promise<boolean> {
   }
 }
 
-export async function flushQueue(): Promise<void> {
-  if (flushPromise) return flushPromise;
-  flushPromise = (async () => {
-    try {
+// One pass: send up to 100 events, drop the stored ones from the queue.
+// Returns true when there may be more to send (a full batch went through,
+// or events were added while this batch was in flight).
+async function flushOnce(): Promise<boolean> {
       const queue = await readQueue();
-      if (queue.length === 0) return;
+      if (queue.length === 0) return false;
 
       const net = await NetInfo.fetch();
       if (!net.isConnected) {
         logger.info('[analytics] flush skipped — no network');
-        return;
+        return false;
       }
 
       // Send up to 100 events per batch to keep payloads small
@@ -232,7 +248,7 @@ export async function flushQueue(): Promise<void> {
 
       if (!res.ok && res.status !== 207) {
         logger.error(`[analytics] flush HTTP ${res.status} via ${useKiosk ? 'kiosk' : 'cloud'} — keeping events queued`);
-        return;
+        return false;
       }
 
       const data = (await res.json().catch(() => null)) as
@@ -242,12 +258,30 @@ export async function flushQueue(): Promise<void> {
       // Kiosk relay accepts blindly (it just appends to events.json). Cloud
       // may reject individual events — preserve those.
       const rejectedIdxs = useKiosk ? new Set<number>() : new Set((data?.errors || []).map((e) => e.index));
-      const remaining = batch.filter((_, i) => rejectedIdxs.has(i)).concat(queue.slice(batch.length));
-      await writeQueue(remaining);
+      // Remove exactly the events that were stored, from the queue as it is
+      // NOW — not from the snapshot taken before the request, which would
+      // throw away anything enqueued while the request was in flight.
+      const stored = new Set(batch.filter((_, i) => !rejectedIdxs.has(i)).map((e) => JSON.stringify(e)));
+      const remaining = await withQueue(async (current) => {
+        const kept = current.filter((e) => !stored.has(JSON.stringify(e)));
+        return { queue: kept, result: kept.length };
+      });
       logger.info(
         `[analytics] flushed via ${useKiosk ? 'kiosk' : 'cloud'}: ` +
-          `attempted=${batch.length}, rejected=${rejectedIdxs.size}, remaining=${remaining.length}`,
+          `attempted=${batch.length}, rejected=${rejectedIdxs.size}, remaining=${remaining}`,
       );
+      return remaining > rejectedIdxs.size;
+}
+
+export async function flushQueue(): Promise<void> {
+  if (flushPromise) return flushPromise;
+  flushPromise = (async () => {
+    try {
+      // Keep going while batches succeed, so a queue longer than one batch
+      // (or events added mid-flight) does not wait for the next trigger.
+      for (let i = 0; i < 20; i++) {
+        if (!(await flushOnce())) break;
+      }
     } catch (err) {
       logger.error('[analytics] flush failed', err);
     } finally {

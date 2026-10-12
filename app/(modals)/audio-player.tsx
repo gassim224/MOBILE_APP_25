@@ -23,6 +23,12 @@ import { addStudyTime } from '@/utils/studyTime';
 import { useConnectionSimulator } from '@/contexts/ConnectionSimulatorContext';
 import { useDownloads } from '@/contexts/DownloadsContext';
 import { ANALYTICS } from '@/constants/AppConstants';
+import PlaybackSpeedControl, {
+  DEFAULT_PLAYBACK_RATE,
+  loadSavedPlaybackRate,
+  savePlaybackRate,
+  type PlaybackRate,
+} from '@/components/PlaybackSpeedControl';
 
 export default function AudioPlayer() {
   const router = useRouter();
@@ -52,6 +58,7 @@ export default function AudioPlayer() {
   const [position, setPosition] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isSeeking, setIsSeeking] = useState(false);
+  const [playbackRate, setPlaybackRate] = useState<PlaybackRate>(DEFAULT_PLAYBACK_RATE);
 
   // Animated soundwave bars
   const waveAnimation1 = useRef(new Animated.Value(0.3)).current;
@@ -105,6 +112,10 @@ export default function AudioPlayer() {
       );
 
       soundRef.current = sound;
+      // Remembered playback speed (shared with the video player).
+      const savedRate = await loadSavedPlaybackRate();
+      setPlaybackRate(savedRate);
+      await applyPlaybackRate(savedRate);
       setIsLoading(false);
 
       // Analytics: emit content_accessed_offline once on audio open
@@ -216,6 +227,22 @@ export default function AudioPlayer() {
         cancelLessonContinuationReminder(lessonId);
       }
     }
+  };
+
+  const applyPlaybackRate = async (rate: PlaybackRate) => {
+    if (!soundRef.current) return;
+    try {
+      // shouldCorrectPitch keeps the voice natural at 1.5× / 2×.
+      await soundRef.current.setRateAsync(rate, true);
+    } catch (error) {
+      console.error('Error setting playback rate:', error);
+    }
+  };
+
+  const changePlaybackRate = (rate: PlaybackRate) => {
+    setPlaybackRate(rate);
+    applyPlaybackRate(rate);
+    savePlaybackRate(rate);
   };
 
   const togglePlayPause = async () => {
@@ -400,6 +427,13 @@ export default function AudioPlayer() {
           </View>
         )}
 
+        {/* Playback speed */}
+        {!isLoading && (
+          <View style={styles.speedContainer}>
+            <PlaybackSpeedControl value={playbackRate} onChange={changePlaybackRate} variant="light" />
+          </View>
+        )}
+
         {/* Progress Indicator */}
         {!isLoading && duration > 0 && (
           <View style={styles.progressInfo}>
@@ -526,6 +560,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.4,
     shadowRadius: 16,
     elevation: 8,
+  },
+  speedContainer: {
+    alignItems: 'center',
+    marginTop: 20,
   },
   progressInfo: {
     alignItems: 'center',

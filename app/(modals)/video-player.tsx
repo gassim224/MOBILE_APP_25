@@ -22,6 +22,12 @@ import { addStudyTime } from '@/utils/studyTime';
 import { useConnectionSimulator } from '@/contexts/ConnectionSimulatorContext';
 import { useDownloads } from '@/contexts/DownloadsContext';
 import { ANALYTICS } from '@/constants/AppConstants';
+import PlaybackSpeedControl, {
+  DEFAULT_PLAYBACK_RATE,
+  loadSavedPlaybackRate,
+  savePlaybackRate,
+  type PlaybackRate,
+} from '@/components/PlaybackSpeedControl';
 
 export default function VideoPlayer() {
   const router = useRouter();
@@ -53,6 +59,10 @@ export default function VideoPlayer() {
   const [position, setPosition] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isSeeking, setIsSeeking] = useState(false);
+  const [playbackRate, setPlaybackRate] = useState<PlaybackRate>(DEFAULT_PLAYBACK_RATE);
+  // The rate is applied once the video has loaded; this remembers whether
+  // that already happened for this mount.
+  const rateAppliedRef = useRef(false);
   const [screenDims, setScreenDims] = useState(Dimensions.get('window'));
   const hideControlsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -177,6 +187,12 @@ export default function VideoPlayer() {
     setPosition(status.positionMillis || 0);
     setDuration(status.durationMillis || 0);
 
+    // Apply the remembered playback speed once the video is ready.
+    if (!rateAppliedRef.current) {
+      rateAppliedRef.current = true;
+      applyPlaybackRate(playbackRateRef.current);
+    }
+
     // Accumulate study time across play/pause transitions
     if (status.isPlaying && playStartRef.current === null) {
       playStartRef.current = Date.now();
@@ -213,6 +229,34 @@ export default function VideoPlayer() {
         cancelLessonContinuationReminder(lessonId);
       }
     }
+  };
+
+  // Current rate, readable from the status callback without a stale closure.
+  const playbackRateRef = useRef<PlaybackRate>(DEFAULT_PLAYBACK_RATE);
+  useEffect(() => {
+    loadSavedPlaybackRate().then((rate) => {
+      playbackRateRef.current = rate;
+      setPlaybackRate(rate);
+      if (rateAppliedRef.current) applyPlaybackRate(rate);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const applyPlaybackRate = async (rate: PlaybackRate) => {
+    if (!videoRef.current) return;
+    try {
+      // shouldCorrectPitch keeps voices natural at 1.5× / 2×.
+      await videoRef.current.setRateAsync(rate, true);
+    } catch (error) {
+      console.error('Error setting playback rate:', error);
+    }
+  };
+
+  const changePlaybackRate = (rate: PlaybackRate) => {
+    playbackRateRef.current = rate;
+    setPlaybackRate(rate);
+    applyPlaybackRate(rate);
+    savePlaybackRate(rate);
   };
 
   const togglePlayPause = async () => {
@@ -345,6 +389,9 @@ export default function VideoPlayer() {
 
             {/* Bottom Controls */}
             <View style={styles.bottomControls}>
+              <View style={styles.speedRow}>
+                <PlaybackSpeedControl value={playbackRate} onChange={changePlaybackRate} disabled={isLoading} />
+              </View>
               {/* Timeline */}
               <View style={styles.timelineContainer}>
                 <Text style={styles.timeText}>{formatTime(position)}</Text>
@@ -440,6 +487,10 @@ const styles = StyleSheet.create({
   bottomControls: {
     paddingHorizontal: 20,
     paddingBottom: Platform.OS === 'ios' ? 40 : 30,
+  },
+  speedRow: {
+    alignItems: 'flex-end',
+    marginBottom: 8,
   },
   timelineContainer: {
     flexDirection: 'row',

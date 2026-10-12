@@ -14,6 +14,8 @@ export const STORAGE_KEYS = {
   LAST_APP_OPEN: 'lastAppOpenTimestamp',
   INACTIVITY_NOTIFICATION_ID: 'inactivityNotificationId',
   SIMULATOR_ENABLED: '@connection_simulator_enabled',
+  // Playback speed chosen in the audio/video players (shared, remembered)
+  PLAYBACK_RATE: '@playback_rate',
   SIMULATED_STATE: '@connection_simulated_state',
   MEDIA_PROGRESS_PREFIX: '@media_progress_',
   COURSE_PROGRESS_PREFIX: 'course_progress_',
