@@ -63,6 +63,9 @@ export interface DownloadedBook {
   thumbnail: string;
   downloadedAt: string;
   pdfUrl?: string;
+  // Kiosk file path — lets a book downloaded under an older id still be
+  // recognised in the library.
+  filename?: string;
 }
 
 export interface MediaProgress {

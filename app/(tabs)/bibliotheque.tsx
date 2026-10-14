@@ -177,6 +177,7 @@ export default function Bibliotheque() {
           day: 'numeric'
         }),
         pdfUrl: localUri, // Store LOCAL path
+        filename: book.filename,
       });
 
       setDownloadingBookId(null);
@@ -192,10 +193,14 @@ export default function Bibliotheque() {
     }
   };
 
-  const isBookDownloaded = (bookId: string) => downloadedBooks.some(b => b.id === bookId);
+  // Match on the stable id, or on the kiosk file path for books downloaded
+  // before ids were stable (their stored id is an old positional one).
+  const findDownloaded = (book: Book) =>
+    downloadedBooks.find(b => b.id === book.id || (!!book.filename && b.filename === book.filename));
+  const isBookDownloaded = (book: Book) => !!findDownloaded(book);
 
   const renderBookCard = ({ item: book }: { item: Book }) => {
-    const downloaded = isBookDownloaded(book.id);
+    const downloaded = isBookDownloaded(book);
     const isGrayedOut = !isConnectedToKiosk && !downloaded;
 
     return (
@@ -231,7 +236,7 @@ export default function Bibliotheque() {
   const renderModal = () => {
     if (!selectedBook) return null;
 
-    const downloaded = isBookDownloaded(selectedBook.id);
+    const downloaded = isBookDownloaded(selectedBook);
     const canDownload = isConnectedToKiosk && !downloaded;
     const cannotDownloadOffline = !isConnectedToKiosk && !downloaded;
 

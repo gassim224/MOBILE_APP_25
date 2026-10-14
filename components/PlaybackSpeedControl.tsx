@@ -43,8 +43,10 @@ interface PlaybackSpeedControlProps {
 
 export default function PlaybackSpeedControl({ value, onChange, disabled, variant = 'dark' }: PlaybackSpeedControlProps) {
   return (
+    // All five options must stay on one line on a phone: on the audio page
+    // the label is dropped and chips are tighter, so 2× never wraps off-screen.
     <View style={styles.row} accessibilityRole="radiogroup" accessibilityLabel="Vitesse de lecture">
-      <Text style={[styles.label, variant === 'light' && styles.labelLight]}>Vitesse</Text>
+      {variant === 'dark' && <Text style={styles.label}>Vitesse</Text>}
       {PLAYBACK_RATES.map((rate) => {
         const active = rate === value;
         return (
@@ -55,7 +57,7 @@ export default function PlaybackSpeedControl({ value, onChange, disabled, varian
             accessibilityRole="radio"
             accessibilityState={{ selected: active, disabled: !!disabled }}
             accessibilityLabel={`Vitesse ${formatRate(rate)}`}
-            style={[styles.chip, active && styles.chipActive, disabled && styles.chipDisabled]}
+            style={[styles.chip, variant === 'light' && styles.chipCompact, active && styles.chipActive, disabled && styles.chipDisabled]}
             activeOpacity={0.8}
           >
             <Text style={[styles.chipText, active && styles.chipTextActive]}>{formatRate(rate)}</Text>
@@ -71,8 +73,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    flexWrap: 'wrap',
-    gap: 8,
+    flexWrap: 'nowrap',
+    gap: 6,
   },
   label: {
     color: 'rgba(255, 255, 255, 0.8)',
@@ -83,9 +85,6 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
   },
-  labelLight: {
-    textShadowColor: 'transparent',
-  },
   chip: {
     minWidth: 52,
     paddingHorizontal: 10,
@@ -95,6 +94,11 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.4)',
     backgroundColor: 'rgba(0, 0, 0, 0.35)',
     alignItems: 'center',
+  },
+  chipCompact: {
+    minWidth: 46,
+    paddingHorizontal: 6,
+    paddingVertical: 7,
   },
   chipActive: {
     backgroundColor: '#FFD700',

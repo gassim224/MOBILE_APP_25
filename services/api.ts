@@ -4,16 +4,13 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { STORAGE_KEYS } from '@/constants/AppConstants';
+import { STORAGE_KEYS, KIOSK_ORIGIN } from '@/constants/AppConstants';
 import logger from '@/utils/Logger';
 
-// API Configuration - Hardcoded for production builds
-// Note: Expo env variables are embedded at build time, but we hardcode for reliability
-// const API_BASE_URL = 'http://10.42.0.1:8001/user';
-// const CLOUD_BASE_URL = 'http://10.42.0.1:8001/cloud';
-
-const API_BASE_URL = 'http://bonecole.local/user'; // Use mDNS for local network access
-const CLOUD_BASE_URL = 'http://bonecole.local/cloud';
+// API Configuration - derived from KIOSK_ORIGIN (see constants/AppConstants.ts)
+// so the API, connectivity ping and analytics relay always target the same host.
+const API_BASE_URL = `${KIOSK_ORIGIN}/user`;
+const CLOUD_BASE_URL = `${KIOSK_ORIGIN}/cloud`;
 
 // API Response Types
 // Actual Login API response format. Role / Subjects / GradeLevels are present
@@ -692,9 +689,11 @@ export const StudentAPI = {
     logger.info('Library API raw response:', JSON.stringify(rawResponse));
     
     if (rawResponse.status && rawResponse.data) {
-      const currentPage = rawResponse.data.page || 1;
-      const books: ApiBook[] = rawResponse.data.books.map((book, index) => ({
-        id: `book_p${currentPage}_${index}`,
+      // Id from the file path, never from the position: a positional id
+      // (`book_p1_0`) pointed at a different book after a search or when
+      // the kiosk added a file, so deleted books still showed as downloaded.
+      const books: ApiBook[] = rawResponse.data.books.map((book) => ({
+        id: stableContentId('book', '', null, book.path),
         title: book.name,
         author: book.author,
         filename: book.path,
