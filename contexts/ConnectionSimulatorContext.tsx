@@ -1,9 +1,10 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
 import NetInfo from "@react-native-community/netinfo";
 import logger from "@/utils/Logger";
+import { KIOSK_ORIGIN } from "@/constants/AppConstants";
 
-// Raspberry Pi kiosk IP — same as API base
-const KIOSK_PING_URL = "http://10.42.0.1:8001/";
+// Raspberry Pi kiosk — same origin as the API base
+const KIOSK_PING_URL = `${KIOSK_ORIGIN}/`;
 const PING_TIMEOUT_MS = 3000;
 const PING_INTERVAL_MS = 8000;
 

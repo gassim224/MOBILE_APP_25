@@ -41,10 +41,15 @@ export const STORAGE_KEYS = {
 //     the Pi which will forward to cloud during the school admin's Sync Now.
 // flushQueue() probes the kiosk first; if reachable it uses the relay,
 // otherwise it falls back to direct cloud.
+// Kiosk (Raspberry Pi) origin — single source of truth for every kiosk URL
+// (API base, connectivity ping, analytics relay). Resolved via mDNS on the
+// school WiFi. Previously the hotspot IP http://10.42.0.1:8001.
+export const KIOSK_ORIGIN = 'http://bonecole.local';
+
 export const ANALYTICS = {
   EVENTS_BATCH_URL: 'https://admin-api.bonecole.com/api/v1/events/batch',
-  KIOSK_QUEUE_URL: 'http://10.42.0.1:8001/events/queue',
-  KIOSK_PROBE_URL: 'http://10.42.0.1:8001/cloud/school/update',
+  KIOSK_QUEUE_URL: `${KIOSK_ORIGIN}/events/queue`,
+  KIOSK_PROBE_URL: `${KIOSK_ORIGIN}/cloud/school/update`,
   // Strict completion per May 2026 product clarification:
   //   - video / audio: user reaches >= 90% of duration
   //   - pdf / ebook : last page reached (handled separately in pdf-reader)
